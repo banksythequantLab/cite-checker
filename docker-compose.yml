@@ -1,0 +1,44 @@
+services:
+  cite:
+    build: .
+    image: cite-checker:latest
+    restart: unless-stopped
+    env_file: .env
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "65534:65534"
+    pids_limit: 128
+    mem_limit: 512m
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    volumes:
+      - cache:/cache
+    networks: [cite-net]
+    expose: ["8120"]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      - SITE_ADDRESS=${SITE_ADDRESS:-:80}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [cite-net, public]   # `public` carries ACME/Let's Encrypt; cite is not on it
+    depends_on: [cite]
+
+networks:
+  cite-net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-cite   # named so egress.sh can pin rules to it
+  public:
+    driver: bridge
+
+volumes:
+  cache:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,8 @@
+{$SITE_ADDRESS} {
+	encode gzip
+	reverse_proxy cite:8120
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+}
