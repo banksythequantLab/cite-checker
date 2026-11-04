@@ -43,3 +43,21 @@ def test_verbatim_quote_check():
     op = "To survive a motion to dismiss, a complaint must contain sufficient factual matter to state a claim to relief that is plausible on its face."
     assert spans.verify(op, "state a claim to relief that is plausible on its face")["verified"]
     assert not spans.verify(op, "prove each element by clear and convincing evidence")["verified"]
+
+
+def test_lookup_cache_spends_quota_once(tmp_path, monkeypatch):
+    import courtlistener as CL
+    monkeypatch.setattr(CL, "_DB", str(tmp_path / "c.db"))
+    calls = []
+    def fake_lookup(text):
+        calls.append(text)
+        return [{"citation": "550 U.S. 544", "normalized_citations": ["550 U.S. 544"],
+                 "status": 200, "clusters": [{"id": 1}]}]
+    monkeypatch.setattr(CL, "lookup", fake_lookup)
+    a = CL.lookup_cites(["550 U.S. 544", "925 F.3d 1339"])
+    b = CL.lookup_cites(["550 U.S. 544", "925 F.3d 1339"])
+    assert len(calls) == 1, "second run must be served from the cache"
+    assert "925 F.3d 1339" in calls[0] and "550 U.S. 544" in calls[0]
+    nf = [r for r in b if r["citation"] == "925 F.3d 1339"][0]
+    assert nf["status"] == 404 and not nf["clusters"]
+    assert [r["citation"] for r in a] == [r["citation"] for r in b]

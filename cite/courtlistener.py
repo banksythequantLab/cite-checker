@@ -104,6 +104,51 @@ def lookup(text: str) -> list[dict]:
         return r.json()
 
 
+def _norm(k: str) -> str:
+    return re.sub(r"\s+", " ", str(k)).strip()
+
+
+def _lk_db():
+    c = _db()
+    c.execute("CREATE TABLE IF NOT EXISTS lookups(cite TEXT PRIMARY KEY, result TEXT, "
+              "fetched_at TEXT)")
+    return c
+
+
+def lookup_cites(cites: list[str]) -> list[dict]:
+    """Resolve a list of citation strings ("550 U.S. 544"), serving from the
+    cache where possible and POSTing only the unknown ones, in one request.
+    Same output shape as lookup(). A 404 (not found) is cached too: the answer
+    for a reporter page does not change day to day, and the free tier is
+    125 requests/day."""
+    want = {_norm(x) for x in cites if x}
+    db = _lk_db()
+    out, missing = [], []
+    for k in sorted(want):
+        row = db.execute("SELECT result FROM lookups WHERE cite=?", (k,)).fetchone()
+        (out.append(_json.loads(row[0])) if row else missing.append(k))
+    if missing:
+        fresh = lookup("\n".join(missing))
+        seen = set()
+        for r in fresh:
+            out.append(r)
+            for k in [r.get("citation")] + list(r.get("normalized_citations") or []):
+                if k:
+                    db.execute("INSERT OR REPLACE INTO lookups VALUES(?,?,datetime('now'))",
+                               (_norm(k), _json.dumps(r)))
+                    seen.add(_norm(k))
+        # a cite CourtListener didn't even echo back: remember that as not-found
+        for k in missing:
+            if k not in seen:
+                nf = {"citation": k, "status": 404, "clusters": [],
+                      "error_message": "not recognised by CourtListener"}
+                out.append(nf)
+                db.execute("INSERT OR REPLACE INTO lookups VALUES(?,?,datetime('now'))",
+                           (k, _json.dumps(nf)))
+        db.commit()
+    return out
+
+
 def _strip(h: str) -> str:
     h = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", h, flags=re.S | re.I)
     t = re.sub(r"<[^>]+>", " ", h)

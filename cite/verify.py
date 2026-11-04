@@ -76,8 +76,8 @@ def check_brief(text: str) -> list[Finding]:
     cites = EX.extract(text)
     if not cites:
         return []
-    # one lookup for the whole brief; map results by "vol rep page"
-    results = CL.lookup(text)
+    # one lookup for the cites not already cached; map results by "vol rep page"
+    results = CL.lookup_cites([c.key for c in cites])
     by_key: dict[str, dict] = {}
     for r in results:
         # the response carries the normalised citation string(s), e.g.
