@@ -15,6 +15,9 @@ Statuses:
   NOT_FOUND   CourtListener has no case at that citation
   AMBIGUOUS   the cite matches several cases
   UNQUOTED    exists, right case, nothing quoted to check
+  UNVERIFIABLE exists, but the opinion text could not be fetched (rate limit,
+              missing text) -- quotes are NOT graded, because grading against
+              nothing would brand a real quote a misquote
 """
 from __future__ import annotations
 
@@ -69,8 +72,11 @@ def check_brief(text: str) -> list[Finding]:
     results = CL.lookup(text)
     by_key: dict[str, dict] = {}
     for r in results:
-        key = f"{r.get('volume')} {r.get('reporter')} {r.get('page')}"
-        by_key[re.sub(r"\s+", " ", key)] = r
+        # the response carries the normalised citation string(s), e.g.
+        # "550 U.S. 544" -- key on those
+        for k in [r.get("citation")] + list(r.get("normalized_citations") or []):
+            if k:
+                by_key[re.sub(r"\s+", " ", str(k)).strip()] = r
 
     findings: list[Finding] = []
     for c in cites:
@@ -86,10 +92,24 @@ def check_brief(text: str) -> list[Finding]:
             findings.append(Finding(c.raw, c.case_name, "NOT_FOUND",
                                     note=r.get("error_message") or "no case at this citation"))
             continue
-        if st == 300 or len(clusters) > 1:
-            findings.append(Finding(c.raw, c.case_name, "AMBIGUOUS",
-                                    note=f"{len(clusters)} candidate cases"))
-            continue
+        if len(clusters) > 1:
+            # several cases share this reporter page (common). Disambiguate by
+            # the case name the BRIEF gives; only call it ambiguous if that
+            # fails to pick exactly one.
+            named = [x for x in clusters if names_match(c.case_name, x.get("case_name"))]
+            # several clusters with the SAME case name = duplicates/related
+            # entries of one case, not an ambiguity for our purpose
+            same = (len(named) >= 1 and all(
+                names_match(named[0].get("case_name"), x.get("case_name")) for x in named))
+            if same:
+                # prefer the earliest-filed (the original opinion over later
+                # related entries) so the quote check runs on the real text
+                clusters = sorted(named, key=lambda x: x.get("date_filed") or "")[:1]
+            else:
+                findings.append(Finding(c.raw, c.case_name, "AMBIGUOUS",
+                                        note=f"{len(clusters)} cases at this citation; "
+                                             f"{len(named)} match the name in the brief"))
+                continue
         cl = clusters[0]
         cl_name = cl.get("case_name")
         url = CL.BASE + (cl.get("absolute_url") or "")
@@ -101,10 +121,14 @@ def check_brief(text: str) -> list[Finding]:
             findings.append(Finding(c.raw, c.case_name, "UNQUOTED", cl_name, url))
             continue
         try:
-            opinion, _meta = CL.opinion_text(cl["id"])
+            opinion, _meta = CL.opinion_text(cl["id"], cluster=cl)
         except CL.CLError as e:
-            findings.append(Finding(c.raw, c.case_name, "UNQUOTED", cl_name, url,
-                                    note=f"could not fetch opinion text: {e}"))
+            # NEVER grade a quote against text we could not fetch: that would
+            # brand a real quote a misquote. Say so instead.
+            findings.append(Finding(c.raw, c.case_name, "UNVERIFIABLE", cl_name, url,
+                                    quotes=[{"quote": q, "verified": None,
+                                             "reason": "opinion text unavailable"} for q in c.quotes],
+                                    note=f"case exists but its text could not be fetched: {e}"))
             continue
         checks = [spans.verify(opinion, q) for q in c.quotes]
         allok = all(ch["verified"] for ch in checks)

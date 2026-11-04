@@ -13,10 +13,68 @@ from __future__ import annotations
 import html
 import os
 import re
+import time
 
 import httpx
 
 BASE = "https://www.courtlistener.com"
+_PACE_S = 1.2            # polite gap between requests; the free tier rate-limits bursts
+_last_call = 0.0
+_cache: dict[int, tuple[str, dict]] = {}
+
+# The free tier allows 125 requests/day on cluster/opinion endpoints. Opinions
+# are immutable, so every fetched opinion is cached on disk permanently and a
+# brief that cites a case we have seen costs zero requests for it. (A product
+# would load CourtListener's free bulk opinion dumps onto a Vultr block-storage
+# volume and never call the API for text at all.)
+import json as _json
+import sqlite3 as _sqlite
+_DB = os.environ.get("CITE_CACHE", os.path.expanduser("~/.cite_cache.db"))
+
+
+def _db():
+    c = _sqlite.connect(_DB)
+    c.execute("CREATE TABLE IF NOT EXISTS opinions(cluster_id INTEGER PRIMARY KEY, "
+              "text TEXT, meta TEXT, fetched_at TEXT)")
+    return c
+
+
+def _cache_get(cluster_id: int):
+    r = _db().execute("SELECT text, meta FROM opinions WHERE cluster_id=?",
+                      (cluster_id,)).fetchone()
+    return (r[0], _json.loads(r[1])) if r else None
+
+
+def _cache_put(cluster_id: int, text: str, meta: dict) -> None:
+    c = _db()
+    c.execute("INSERT OR REPLACE INTO opinions VALUES(?,?,?,datetime('now'))",
+              (cluster_id, text, _json.dumps(meta)))
+    c.commit()
+
+
+def _get(c: httpx.Client, url: str, tries: int = 5) -> httpx.Response:
+    """GET with pacing and exponential backoff on 429/5xx. A 429 must never be
+    mistaken for 'no text' -- it is retried, and if it still fails we raise."""
+    global _last_call
+    for i in range(tries):
+        wait = _PACE_S - (time.monotonic() - _last_call)
+        if wait > 0:
+            time.sleep(wait)
+        r = c.get(url)
+        _last_call = time.monotonic()
+        if r.status_code == 429:
+            ra = r.headers.get("retry-after")
+            if ra and ra.isdigit() and int(ra) > 300:
+                # the DAILY quota, not a burst: do not sit in a retry loop
+                raise CLError(f"CourtListener daily quota exhausted; resets in "
+                              f"{int(ra)//3600}h{(int(ra)%3600)//60}m")
+            time.sleep(float(ra) if ra and ra.isdigit() else (2 ** i) * 1.5)
+            continue
+        if r.status_code >= 500:
+            time.sleep((2 ** i) * 1.5)
+            continue
+        return r
+    raise CLError(f"{url}: still rate-limited after {tries} tries (HTTP {r.status_code})")
 
 
 class CLError(RuntimeError):
@@ -52,17 +110,29 @@ def _strip(h: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(t)).strip()
 
 
-def opinion_text(cluster_id: int) -> tuple[str, dict]:
-    """Full text of a cluster's opinion(s) + the cluster's metadata."""
+def opinion_text(cluster_id: int, cluster: dict | None = None) -> tuple[str, dict]:
+    """Full text of a cluster's opinion(s) + metadata. Disk-cached forever.
+    Pass the cluster dict from citation-lookup when you have it: it already
+    carries sub_opinions, which saves the cluster GET (one request per cite).
+    Raises CLError rather than ever returning empty text silently."""
+    if cluster_id in _cache:
+        return _cache[cluster_id]
+    hit = _cache_get(cluster_id)
+    if hit:
+        _cache[cluster_id] = hit
+        return hit
     with _client() as c:
-        r = c.get(f"/api/rest/v4/clusters/{cluster_id}/")
-        if r.status_code != 200:
-            raise CLError(f"cluster {cluster_id} HTTP {r.status_code}")
-        cl = r.json()
+        if cluster and cluster.get("sub_opinions"):
+            cl = cluster
+        else:
+            r = _get(c, f"/api/rest/v4/clusters/{cluster_id}/")
+            if r.status_code != 200:
+                raise CLError(f"cluster {cluster_id} HTTP {r.status_code}: {r.text[:120]}")
+            cl = r.json()
         texts = []
         for url in cl.get("sub_opinions", []):
             oid = str(url).rstrip("/").split("/")[-1]
-            o = c.get(f"/api/rest/v4/opinions/{oid}/")
+            o = _get(c, f"/api/rest/v4/opinions/{oid}/")
             if o.status_code != 200:
                 continue
             od = o.json()
@@ -77,4 +147,9 @@ def opinion_text(cluster_id: int) -> tuple[str, dict]:
                 "url": BASE + (cl.get("absolute_url") or ""),
                 "citations": [f"{x.get('volume')} {x.get('reporter')} {x.get('page')}"
                               for x in cl.get("citations", [])]}
-        return "\n\n".join(texts), meta
+        full = "\n\n".join(texts)
+        if not full.strip():
+            raise CLError(f"cluster {cluster_id}: no opinion text available")
+        _cache[cluster_id] = (full, meta)
+        _cache_put(cluster_id, full, meta)
+        return full, meta
