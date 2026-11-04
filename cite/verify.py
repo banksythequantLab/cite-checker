@@ -12,7 +12,10 @@ Statuses:
   VERIFIED    exists, right case, every quote found
   MISQUOTE    exists, right case, but a quoted passage is not in the opinion
   WRONG_CASE  the cite resolves to a different case than the brief names
-  NOT_FOUND   CourtListener has no case at that citation
+  NOT_FOUND   CourtListener has no case at that citation. This is a coverage
+              statement, NOT a fabrication verdict: CourtListener's database is
+              incomplete (unpublished, WL-only and many state decisions are
+              missing). The reviewer confirms in Westlaw/Lexis.
   AMBIGUOUS   the cite matches several cases
   UNQUOTED    exists, right case, nothing quoted to check
   UNVERIFIABLE exists, but the opinion text could not be fetched (rate limit,
@@ -22,6 +25,11 @@ Statuses:
 from __future__ import annotations
 
 import re
+
+NOT_FOUND_NOTE = ("Not in CourtListener's database. That does not mean the case "
+                  "is fabricated: CourtListener coverage is incomplete (unpublished, "
+                  "WL-only and many state decisions are absent). Confirm in "
+                  "Westlaw or Lexis before relying on it or striking it.")
 from dataclasses import dataclass, field, asdict
 
 import courtlistener as CL
@@ -84,13 +92,13 @@ def check_brief(text: str) -> list[Finding]:
         if r is None:
             # CourtListener did not even see this as a citation -> treat as not found
             findings.append(Finding(c.raw, c.case_name, "NOT_FOUND",
-                                    note="citation not recognised by CourtListener"))
+                                    note=NOT_FOUND_NOTE))
             continue
         st = r.get("status")
         clusters = r.get("clusters") or []
         if st == 404 or not clusters:
             findings.append(Finding(c.raw, c.case_name, "NOT_FOUND",
-                                    note=r.get("error_message") or "no case at this citation"))
+                                    note=NOT_FOUND_NOTE))
             continue
         if len(clusters) > 1:
             # several cases share this reporter page (common). Disambiguate by

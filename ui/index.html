@@ -60,6 +60,7 @@ a{color:var(--accent)}
       <label class="note"><input type="checkbox" id="sup" checked> find supporting passages for paraphrased cites</label>
     </div>
     <p class="note">Existence and case identity come from CourtListener. Quotes are verbatim string matches against the opinion. A model only proposes passages, which are then verified word-for-word. You review every flag.</p>
+    <p class="note"><b>NOT IN CL</b> means the citation is not in CourtListener's database — a coverage statement, not a fabrication verdict. CourtListener is missing many unpublished, WL-only and state decisions. Confirm in Westlaw or Lexis.</p>
   </section>
   <section>
     <h2>Findings</h2>
@@ -70,6 +71,8 @@ a{color:var(--accent)}
 <script>
 const q=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LABEL={NOT_FOUND:'NOT IN CL',WRONG_CASE:'WRONG CASE',MISQUOTE:'MISQUOTE',AMBIGUOUS:'AMBIGUOUS',UNQUOTED:'UNQUOTED',VERIFIED:'VERIFIED',UNVERIFIABLE:'UNVERIFIABLE'};
+const label=s=>LABEL[s]||String(s).replace('_',' ');
 const api=async(u,o)=>(await fetch(u,o)).json();
 const SAMPLE=`MEMORANDUM OF LAW IN SUPPORT OF DEFENDANT'S MOTION TO DISMISS
 
@@ -95,8 +98,8 @@ q('#btn-check').onclick=async e=>{
 function render(r){
   const f=q('#findings'),k=q('#kpis');
   if(!r||!r.ok){f.innerHTML=`<div class="card NOT_FOUND"><span class="badge NOT_FOUND">ERROR</span> <span class="note">${esc(r&&r.detail||'check failed')}</span></div>`;k.innerHTML='';return;}
-  const order=['NOT_FOUND','WRONG_CASE','MISQUOTE','AMBIGUOUS','UNQUOTED','VERIFIED'];
-  k.innerHTML=order.filter(s=>r.counts[s]).map(s=>`<div class="kpi"><div class="n">${r.counts[s]}</div><div class="l">${s.replace('_',' ')}</div></div>`).join('');
+  const order=['NOT_FOUND','WRONG_CASE','MISQUOTE','AMBIGUOUS','UNVERIFIABLE','UNQUOTED','VERIFIED'];
+  k.innerHTML=order.filter(s=>r.counts[s]).map(s=>`<div class="kpi"><div class="n">${r.counts[s]}</div><div class="l">${label(s)}</div></div>`).join('');
   const sorted=r.citations.slice().sort((a,b)=>order.indexOf(a.status)-order.indexOf(b.status));
   f.innerHTML=sorted.map(c=>{
     let body='';
@@ -105,7 +108,7 @@ function render(r){
       else if(c.support.passage&&c.support.passage.verified) body+=`<div class="q sup">supporting passage (verified verbatim) · model says: ${esc(c.support.model_supports)} · “${esc(c.support.passage.matched)}”</div><div class="note">${esc(c.support.note)}</div>`;
       else body+=`<div class="note">no verifiable supporting passage found — review manually. ${esc(c.support.note||'')}</div>`; }
     return `<div class="card ${esc(c.status)}">
-      <div class="row" style="justify-content:space-between"><span class="cite">${esc(c.citation)}</span><span class="badge ${esc(c.status)}">${esc(c.status.replace('_',' '))}</span></div>
+      <div class="row" style="justify-content:space-between"><span class="cite">${esc(c.citation)}</span><span class="badge ${esc(c.status)}">${esc(label(c.status))}</span></div>
       <div class="name">${esc(c.case_name_in_brief||'(no case name parsed)')}</div>
       ${c.cl_case_name?`<div class="cl">CourtListener: ${esc(c.cl_case_name)} — <a href="${esc(c.cl_url)}" target="_blank">open the opinion</a></div>`:''}
       ${c.note?`<div class="note">${esc(c.note)}</div>`:''}${body}</div>`;}).join('');
