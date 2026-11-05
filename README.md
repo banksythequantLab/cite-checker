@@ -12,6 +12,19 @@ In *Mata v. Avianca, Inc.*, No. 22-cv-1461 (PKC) (S.D.N.Y. June 22, 2023), lawye
 
 Checking is tedious and exactly the kind of thing a machine should do — provided the machine cannot itself make things up. So this tool is built so that **nothing a model says ever reaches the reviewer unverified**.
 
+### How current this is
+
+Damien Charlotin's [*AI Hallucination Cases*](https://www.damiencharlotin.com/hallucinations/) database tracks court decisions that caught hallucinated citations. Counting its CSV (2,266 decisions, downloaded Nov 5, 2026) by decision year and filing party:
+
+| year | lawyers | pro se | judges / courts | other | total |
+|---|---|---|---|---|---|
+| 2023 | 6 | 9 | 0 | 1 | 16 |
+| 2024 | 25 | 34 | 1 | 1 | 61 |
+| 2025 | 359 | 481 | 14 | 11 | 865 |
+| 2026 (to Nov 5) | 511 | 779 | 18 | 16 | 1,324 |
+
+1,535 of them are U.S. courts; in 33 the judge or court itself relied on a hallucinated citation, including two federal judges who [withdrew orders in October 2025](https://reason.com/volokh/2025/10/24/two-federal-judges-apologize-for-issuing-opinions-with-ai-hallucinations/). The last two months are still being catalogued, so 2026 is an undercount. `scripts/hallucination_stats.py` reproduces the table from the CSV.
+
 ## What it does
 
 Paste a brief. For every case citation:
