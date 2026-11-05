@@ -33,8 +33,15 @@ S3 = "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/bulk-data"
 csv.field_size_limit(1 << 30)
 
 
-def stream_csv(name: str, date: str):
-    """Yield dict rows from an S3 bz2 CSV without ever writing it to disk."""
+def stream_csv(name: str, date: str, stdin: bool = False):
+    """Yield dict rows from an S3 bz2 CSV without ever writing it to disk.
+    With stdin=True, read already-decompressed CSV text from sys.stdin instead
+    (so `curl ... | lbzip2 -dc -n 4 | ...` can decompress on several cores;
+    bz2 is the slowest stage and Python's decoder is single-threaded)."""
+    if stdin:
+        yield from csv.DictReader(sys.stdin, quotechar='"', escapechar="\\",
+                                  doublequote=False, strict=True)
+        return
     url = f"{S3}/{name}-{date}.csv.bz2"
 
     def lines():
@@ -115,30 +122,57 @@ def text_path(index_path: str) -> str:
     return os.environ.get("CITE_BULK_TEXT_DB") or re.sub(r"\.db$", "", index_path) + "-text.db"
 
 
-def build_text(date: str, out: str):
+_TEXT_COLS = ("html_with_citations", "html", "xml_harvard", "html_lawbox",
+              "html_columbia", "html_anon_2020")
+
+
+def _prep(item):
+    """Worker: (id, cluster_id, type, raw, is_html) -> (id, cluster_id, type, blob)."""
+    oid, cid, typ, raw, is_html = item
+    text = _strip(raw) if is_html else raw
+    if not text.strip():
+        return None
+    import zstandard as zstd
+    return (oid, cid, typ, zstd.ZstdCompressor(level=3).compress(text.encode()))
+
+
+def build_text(date: str, out: str, stdin: bool = False, workers: int = 3):
+    import multiprocessing as mp
     out = text_path(out)
-    try:
-        import zstandard as zstd
-        cx = zstd.ZstdCompressor(level=6); codec = "zstd"
-    except ImportError:
-        cx = None; codec = "raw"
     c = _db(out)
-    n = kept = 0
-    for row in stream_csv("opinions", date):
-        n += 1
-        text = row.get("plain_text") or ""
-        if len(text.strip()) < 200:
-            for col in ("html_with_citations", "html", "xml_harvard", "html_lawbox",
-                        "html_columbia", "html_anon_2020"):
+    n = kept = 0; t0 = time.time()
+
+    def items():
+        nonlocal n
+        for row in stream_csv("opinions", date, stdin=stdin):
+            n += 1
+            text = row.get("plain_text") or ""
+            if len(text.strip()) >= 200:
+                yield (int(row["id"]), int(row["cluster_id"]), row["type"], text, False)
+                continue
+            for col in _TEXT_COLS:
                 if row.get(col) and len(row[col]) > 200:
-                    text = _strip(row[col]); break
-        if not text.strip():
-            continue
-        blob = cx.compress(text.encode()) if cx else text.encode()
-        c.execute("INSERT OR REPLACE INTO opinions VALUES(?,?,?,?,?)",
-                  (int(row["id"]), int(row["cluster_id"]), row["type"], blob, codec))
-        kept += 1
-        if n % 20000 == 0: c.commit()
+                    yield (int(row["id"]), int(row["cluster_id"]), row["type"], row[col], True)
+                    break
+
+    try:
+        with mp.Pool(workers) as pool:
+            for res in pool.imap(_prep, items(), chunksize=64):
+                if res is None:
+                    continue
+                c.execute("INSERT OR REPLACE INTO opinions VALUES(?,?,?,?,'zstd')", res)
+                kept += 1
+                if kept % 20000 == 0:
+                    c.commit()
+                    print(f"  opinions: {n:,} rows, {kept:,} stored, "
+                          f"{n/max(time.time()-t0,1):.0f} rows/s", file=sys.stderr, flush=True)
+    except csv.Error as e:
+        # a torn stream (network cut, truncated pipe). Keep what was stored but
+        # do NOT mark the store complete: the app must not serve a partial dump.
+        c.commit()
+        print(f"STREAM TORN after {n:,} rows ({kept:,} stored): {e} -- text_date NOT written",
+              file=sys.stderr)
+        sys.exit(3)
     c.commit()
     c.execute("INSERT OR REPLACE INTO meta VALUES('text_date',?)", (date,))
     c.commit()
@@ -219,5 +253,10 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["build-index", "build-text"])
     ap.add_argument("--date", default="2026-09-30")
     ap.add_argument("--out", default=os.environ.get("CITE_BULK_DB", "cl.db"))
+    ap.add_argument("--stdin", action="store_true", help="read decompressed CSV from stdin")
+    ap.add_argument("--workers", type=int, default=3)
     a = ap.parse_args()
-    (build_index if a.cmd == "build-index" else build_text)(a.date, a.out)
+    if a.cmd == "build-index":
+        build_index(a.date, a.out)
+    else:
+        build_text(a.date, a.out, stdin=a.stdin, workers=a.workers)
