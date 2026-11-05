@@ -8,7 +8,7 @@ exec >>/var/log/cite-init.log 2>&1
 REPO="${REPO:-https://github.com/banksythequantLab/cite-checker.git}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git ipset iptables
+apt-get install -y -qq ca-certificates curl git
 command -v docker >/dev/null || { curl -fsSL https://get.docker.com | sh; }
 systemctl enable --now docker
 
@@ -25,29 +25,6 @@ SITE_ADDRESS=__SITE_ADDRESS__
 EOF
 umask 022
 
-# the allow-list, refreshed every 10 minutes so DNS changes don't break it
-cat >/etc/systemd/system/cite-egress.service <<UNIT
-[Unit]
-Description=cite egress allow-list
-After=docker.service
-[Service]
-Type=oneshot
-ExecStart=/opt/cite/app/deploy/egress.sh
-UNIT
-cat >/etc/systemd/system/cite-egress.timer <<UNIT
-[Unit]
-Description=refresh cite egress allow-list
-[Timer]
-OnBootSec=1min
-OnUnitActiveSec=10min
-[Install]
-WantedBy=timers.target
-UNIT
 chmod +x deploy/*.sh
-systemctl daemon-reload
-systemctl enable --now cite-egress.timer
-
 docker compose up -d --build
-sleep 5
-bash deploy/egress.sh
 echo "CITE-INIT-DONE"

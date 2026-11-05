@@ -4,6 +4,10 @@ services:
     image: cite-checker:latest
     restart: unless-stopped
     env_file: .env
+    environment:
+      # the ONLY way out of the internal network; proxy allow-lists by hostname
+      - HTTPS_PROXY=http://egress-proxy:3128
+      - HTTP_PROXY=http://egress-proxy:3128
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -17,6 +21,19 @@ services:
     networks: [cite-net]
     expose: ["8120"]
 
+  egress-proxy:
+    build: deploy/egress-proxy
+    image: cite-egress-proxy:latest
+    restart: unless-stopped
+    environment:
+      - EGRESS_ALLOW=courtlistener.com,www.courtlistener.com,api.vultrinference.com
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    networks: [cite-net, public]
+
   caddy:
     image: caddy:2
     restart: unless-stopped
@@ -27,14 +44,17 @@ services:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    networks: [cite-net, public]   # `public` carries ACME/Let's Encrypt; cite is not on it
+    networks: [cite-net, public]   # `public` carries ACME/Let's Encrypt
     depends_on: [cite]
 
 networks:
   cite-net:
+    # INTERNAL: the kernel gives this bridge no route off the host. The app can
+    # reach caddy and the egress proxy, and nothing else on earth.
+    internal: true
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.name: br-cite   # named so egress.sh can pin rules to it
+      com.docker.network.bridge.name: br-cite
   public:
     driver: bridge
 

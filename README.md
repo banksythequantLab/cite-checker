@@ -54,15 +54,15 @@ Chambers v. Time Warner, Inc., 282 F.3d 147      UNQUOTED  (resolved to cluster 
 
 ## Blast radius zero
 
-The app runs on a Vultr Cloud Compute instance in a container that is read-only, unprivileged (`nobody`), every capability dropped, `no-new-privileges`, 512 MB, 128 pids. Its **egress is allow-listed by the host kernel**, not by application code: iptables in `DOCKER-USER` permits the cite bridge to reach exactly `courtlistener.com` and `api.vultrinference.com` on 443 and logs-then-rejects everything else (`deploy/egress.sh`). Caddy terminates TLS on a separate bridge.
+The app runs on a Vultr Cloud Compute instance in a container that is read-only, unprivileged (`nobody`), every capability dropped, `no-new-privileges`, 512 MB, 128 pids. Its network is a Docker **internal** bridge: the kernel gives it no route off the host at all. The only door out is `deploy/egress-proxy`, a 90-line CONNECT proxy that allows exactly two hostnames on 443 — `courtlistener.com` and `api.vultrinference.com` — and refuses everything else **by hostname**, logging each refusal as a JSON line. (An earlier version pinned IPs with ipset; CourtListener sits behind CloudFront and the IPs rotated out from under it within hours. Hostnames are the right primitive.) Caddy terminates TLS on a separate bridge.
 
-`deploy/verify_egress.sh` is the sealing proof. It runs probes *inside* the app container: the two allowed hosts open, `1.1.1.1:443` and `example.com:443` are refused by the kernel, the refusals appear in the kernel log, the filesystem is read-only, and the process cannot escalate.
+`deploy/verify_egress.sh` is the sealing proof. It runs probes *inside* the app container: direct sockets to `1.1.1.1` and to CourtListener are refused by the kernel; through the proxy the two allowed hosts answer; `example.com` and an invented exfil host are refused and appear in the egress log by name; the filesystem is read-only; the process cannot escalate.
 
 ## Vultr services
 
 | service | role |
 |---|---|
-| **Vultr Cloud Compute** | runs the control plane (FastAPI), the sandboxed app container, Caddy, and the kernel egress policy |
+| **Vultr Cloud Compute** | runs the control plane (FastAPI), the sandboxed app container, the egress proxy, and Caddy |
 | **Vultr Serverless Inference** | the only model call — proposing supporting passages — via the OpenAI-compatible endpoint at `https://api.vultrinference.com/v1`; model IDs resolved live |
 
 ## Run it
@@ -74,7 +74,7 @@ uvicorn app:app --app-dir cite --port 8120
 python3 -m pytest tests/ -q     # 7 tests, no network
 ```
 
-Deploy to Vultr: put `VULTR_API_KEY` in `.env` and run `python3 deploy/vultr_create.py`. It renders `deploy/cloud-init.sh` as user data; the instance installs Docker, clones this repo, brings up the stack, and installs the egress allow-list on a 10-minute refresh timer. Then run `bash deploy/verify_egress.sh` on the instance.
+Deploy to Vultr: put `VULTR_API_KEY` in `.env` and run `python3 deploy/vultr_create.py`. It renders `deploy/cloud-init.sh` as user data; the instance installs Docker, clones this repo and brings up the stack. Then run `bash deploy/verify_egress.sh` on the instance.
 
 CourtListener's free tier is **125 opinion requests per day**; results are cached in SQLite so a re-check is free. The product version loads CourtListener's bulk opinion dump onto Vultr Block Storage and never hits the quota.
 
