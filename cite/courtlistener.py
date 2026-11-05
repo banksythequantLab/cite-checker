@@ -124,7 +124,18 @@ def lookup_cites(cites: list[str]) -> list[dict]:
     want = {_norm(x) for x in cites if x}
     db = _lk_db()
     out, missing = [], []
+    import bulk
+    local = bulk.available()
     for k in sorted(want):
+        if local:
+            parts = k.split(" ")
+            if len(parts) >= 3:
+                cl = bulk.lookup_local(parts[0], " ".join(parts[1:-1]), parts[-1])
+                if cl:
+                    out.append({"citation": k, "normalized_citations": [k], "status": 200,
+                                "clusters": cl, "source": "bulk"})
+                    continue
+            # not in the local dump: fall through to the API (newer cases, odd reporters)
         row = db.execute("SELECT result FROM lookups WHERE cite=?", (k,)).fetchone()
         (out.append(_json.loads(row[0])) if row else missing.append(k))
     if missing:
@@ -166,6 +177,12 @@ def opinion_text(cluster_id: int, cluster: dict | None = None) -> tuple[str, dic
     if hit:
         _cache[cluster_id] = hit
         return hit
+    import bulk
+    if bulk.available():
+        t = bulk.opinion_text_local(cluster_id)
+        if t and t.strip():
+            _cache[cluster_id] = (t, {"source": "bulk"})
+            return _cache[cluster_id]
     with _client() as c:
         if cluster and cluster.get("sub_opinions"):
             cl = cluster

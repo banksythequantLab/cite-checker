@@ -8,6 +8,7 @@ services:
       # the ONLY way out of the internal network; proxy allow-lists by hostname
       - HTTPS_PROXY=http://egress-proxy:3128
       - HTTP_PROXY=http://egress-proxy:3128
+      - CITE_BULK_DB=/data/cl.db      # local CourtListener index (cite/bulk.py); API is the fallback
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -18,6 +19,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,size=32m
     volumes:
       - cache:/cache
+      - ${CITE_DATA_DIR:-/opt/cite/data}:/data:ro
     networks: [cite-net]
     expose: ["8120"]
 
