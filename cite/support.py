@@ -25,8 +25,10 @@ Never paraphrase the passage. Never invent text."""
 
 
 def find_support(inf: Vultr, brief_context: str, opinion: str) -> dict:
+    # max_tokens must cover the model's reasoning tokens too: at 500,
+    # glm-5.3-flash hit finish_reason=length mid-JSON and looked like "no passage".
     resp = inf.client.chat.completions.create(
-        model=inf.model, temperature=0, max_tokens=500,
+        model=inf.model, temperature=0, max_tokens=2000, timeout=120,
         messages=[{"role": "system", "content": SYSTEM},
                   {"role": "user", "content":
                    f"BRIEF (the citing sentence):\n{brief_context[:1500]}\n\n"
