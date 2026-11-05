@@ -34,7 +34,9 @@ def health():
     idx = None
     if bulk.available():
         m = dict(bulk._q().execute("SELECT k, v FROM meta").fetchall())
-        idx = {"index_date": m.get("index_date"), "text_date": m.get("text_date")}
+        t = bulk._t()
+        idx = {"index_date": m.get("index_date"),
+               "text_date": t.execute("SELECT v FROM meta WHERE k='text_date'").fetchone()[0] if t else None}
     return {"ok": True, "courtlistener_token": bool(os.environ.get("COURTLISTENER_TOKEN")),
             "model": inf.model if inf.api_key else None, "bulk_index": idx}
 

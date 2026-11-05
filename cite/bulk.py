@@ -111,7 +111,12 @@ def _strip(h: str) -> str:
     return re.sub(r"\s+", " ", _html.unescape(t)).strip()
 
 
+def text_path(index_path: str) -> str:
+    return os.environ.get("CITE_BULK_TEXT_DB") or re.sub(r"\.db$", "", index_path) + "-text.db"
+
+
 def build_text(date: str, out: str):
+    out = text_path(out)
     try:
         import zstandard as zstd
         cx = zstd.ZstdCompressor(level=6); codec = "zstd"
@@ -169,8 +174,32 @@ def lookup_local(vol: str, rep: str, page: str) -> list[dict]:
              "absolute_url": f"/opinion/{r[0]}/{r[4]}/", "sub_opinions": []} for r in rows]
 
 
+_T = None
+
+
+def _t():
+    """Read-only handle on the text store, only once its build has finished
+    (meta.text_date is written last). None while it is still being built."""
+    global _T
+    if _T is None:
+        p = text_path(os.environ["CITE_BULK_DB"])
+        if not os.path.exists(p):
+            return None
+        t = sqlite3.connect(f"file:{p}?mode=ro", uri=True, check_same_thread=False)
+        try:
+            if not t.execute("SELECT v FROM meta WHERE k='text_date'").fetchone():
+                t.close(); return None
+        except sqlite3.Error:
+            t.close(); return None
+        _T = t
+    return _T
+
+
 def opinion_text_local(cluster_id: int) -> str | None:
-    rows = _q().execute("SELECT text, codec FROM opinions WHERE cluster_id=? ORDER BY "
+    t = _t()
+    if t is None:
+        return None
+    rows = t.execute("SELECT text, codec FROM opinions WHERE cluster_id=? ORDER BY "
                         "CASE type WHEN '010combined' THEN 0 WHEN '020lead' THEN 1 ELSE 2 END",
                         (cluster_id,)).fetchall()
     if not rows:
