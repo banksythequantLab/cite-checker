@@ -45,13 +45,10 @@ def stream_csv(name: str, date: str):
             total = int(r.headers.get("content-length", 0))
             for chunk in r.iter_bytes(1 << 20):
                 done += len(chunk)
-                buf += dec.decompress(chunk).decode("utf-8", "replace")
-                while True:
-                    j = buf.find("\n")
-                    if j == -1:
-                        break
-                    yield buf[:j + 1]
-                    buf = buf[j + 1:]
+                parts = (buf + dec.decompress(chunk).decode("utf-8", "replace")).split("\n")
+                buf = parts.pop()            # partial last line waits for the next chunk
+                for line in parts:
+                    yield line + "\n"
                 if done - mark >= (256 << 20):
                     mark = done
                     rate = done / max(time.time() - t0, 1) / 1e6
