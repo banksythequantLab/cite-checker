@@ -97,8 +97,9 @@ def check_brief(text: str) -> list[Finding]:
         st = r.get("status")
         clusters = r.get("clusters") or []
         if st == 404 or not clusters:
-            findings.append(Finding(c.raw, c.case_name, "NOT_FOUND",
-                                    note=NOT_FOUND_NOTE))
+            em = r.get("error_message") or ""
+            note = NOT_FOUND_NOTE + (" (" + em + ")" if "could not be asked" in em else "")
+            findings.append(Finding(c.raw, c.case_name, "NOT_FOUND", note=note))
             continue
         if len(clusters) > 1:
             # several cases share this reporter page (common). Disambiguate by

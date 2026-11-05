@@ -138,8 +138,28 @@ def lookup_cites(cites: list[str]) -> list[dict]:
             # not in the local dump: fall through to the API (newer cases, odd reporters)
         row = db.execute("SELECT result FROM lookups WHERE cite=?", (k,)).fetchone()
         (out.append(_json.loads(row[0])) if row else missing.append(k))
+    if missing and local:
+        # the API is only a fallback for cites newer than the dump or in odd
+        # reporters. If it is throttled, say so on each finding instead of
+        # failing the whole brief; do NOT cache these as 404.
+        try:
+            fresh = lookup("\n".join(missing))
+        except CLError as e:
+            for k in missing:
+                out.append({"citation": k, "status": 404, "clusters": [],
+                            "error_message": "not in the local CourtListener index "
+                            "(bulk dump); the live API could not be asked: " + str(e)[:90]})
+            return out
+        return _absorb(db, missing, fresh, out)
     if missing:
         fresh = lookup("\n".join(missing))
+        return _absorb(db, missing, fresh, out)
+    return out
+
+
+def _absorb(db, missing, fresh, out):
+    """Merge fresh API results into `out`, caching each (found or not)."""
+    if True:
         seen = set()
         for r in fresh:
             out.append(r)

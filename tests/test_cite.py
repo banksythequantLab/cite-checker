@@ -61,3 +61,20 @@ def test_lookup_cache_spends_quota_once(tmp_path, monkeypatch):
     nf = [r for r in b if r["citation"] == "925 F.3d 1339"][0]
     assert nf["status"] == 404 and not nf["clusters"]
     assert [r["citation"] for r in a] == [r["citation"] for r in b]
+
+
+def test_throttled_api_with_local_index_degrades_per_cite(tmp_path, monkeypatch):
+    import courtlistener as CL, bulk
+    monkeypatch.setattr(CL, "_DB", str(tmp_path / "c.db"))
+    db = str(tmp_path / "cl.db"); c = bulk._db(db)
+    c.execute("INSERT INTO citations VALUES('550','U.S.','544',145,1)")
+    c.execute("INSERT INTO clusters VALUES(145,'Bell Atlantic Corp. v. Twombly','','2007-05-21','x','Published')")
+    c.commit(); c.close()
+    monkeypatch.setenv("CITE_BULK_DB", db); monkeypatch.setattr(bulk, "_Q", None)
+    monkeypatch.setattr(CL, "lookup", lambda t: (_ for _ in ()).throw(CL.CLError("HTTP 429 throttled")))
+    out = CL.lookup_cites(["550 U.S. 544", "925 F.3d 1339"])
+    by = {r["citation"]: r for r in out}
+    assert by["550 U.S. 544"]["status"] == 200 and by["550 U.S. 544"]["source"] == "bulk"
+    assert by["925 F.3d 1339"]["status"] == 404 and "could not be asked" in by["925 F.3d 1339"]["error_message"]
+    # and the throttled miss was NOT cached as a 404
+    assert CL._lk_db().execute("select count(*) from lookups").fetchone()[0] == 0
