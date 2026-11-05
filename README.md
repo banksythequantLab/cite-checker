@@ -1,6 +1,6 @@
 # Cite Checker
 
-**Every citation in a brief, checked against the real opinion. The model proposes; strings and CourtListener decide; a lawyer reviews every flag.**
+**Every citation in a brief, checked against the real opinion. The AI proposes; the opinion decides; a lawyer reviews every flag.**
 
 Built for the [Vultr: Agent Rush Hackathon](https://lablab.ai/ai-hackathons/vultr-hackathon) — Challenge 1, *Blast Radius Zero*.
 
