@@ -155,17 +155,31 @@ def build_text(date: str, out: str, stdin: bool = False, workers: int = 3):
                     yield (int(row["id"]), int(row["cluster_id"]), row["type"], row[col], True)
                     break
 
+    def flush(batch):
+        nonlocal kept
+        for res in pool.map(_prep, batch, chunksize=32):
+            if res is None:
+                continue
+            c.execute("INSERT OR REPLACE INTO opinions VALUES(?,?,?,?,'zstd')", res)
+            kept += 1
+        c.commit()
+
     try:
-        with mp.Pool(workers) as pool:
-            for res in pool.imap(_prep, items(), chunksize=64):
-                if res is None:
-                    continue
-                c.execute("INSERT OR REPLACE INTO opinions VALUES(?,?,?,?,'zstd')", res)
-                kept += 1
-                if kept % 20000 == 0:
-                    c.commit()
+        # BOUNDED batches. Pool.imap consumes its input eagerly and queued the
+        # whole decompressed stream in RAM on the first run; this feeds the pool
+        # one batch at a time, so memory stays flat.
+        pool = mp.Pool(workers)
+        batch = []
+        for item in items():
+            batch.append(item)
+            if len(batch) >= 256:
+                flush(batch); batch = []
+                if n % 20000 < 256:
                     print(f"  opinions: {n:,} rows, {kept:,} stored, "
                           f"{n/max(time.time()-t0,1):.0f} rows/s", file=sys.stderr, flush=True)
+        if batch:
+            flush(batch)
+        pool.close(); pool.join()
     except csv.Error as e:
         # a torn stream (network cut, truncated pipe). Keep what was stored but
         # do NOT mark the store complete: the app must not serve a partial dump.
