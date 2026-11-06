@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -26,6 +26,12 @@ inf = Vultr()
 @app.get("/", response_class=HTMLResponse)
 def index():
     return UI.read_text() if UI.exists() else "<h1>Cite Checker</h1>"
+
+
+@app.get("/og.png")
+def og_image():
+    return FileResponse(HERE.parent / "ui" / "og.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/health")
