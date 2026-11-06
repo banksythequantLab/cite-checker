@@ -78,3 +78,19 @@ def test_throttled_api_with_local_index_degrades_per_cite(tmp_path, monkeypatch)
     assert by["925 F.3d 1339"]["status"] == 404 and "could not be asked" in by["925 F.3d 1339"]["error_message"]
     # and the throttled miss was NOT cached as a 404
     assert CL._lk_db().execute("select count(*) from lookups").fetchone()[0] == 0
+
+
+def test_quote_survives_star_pagination_and_footnote_markers():
+    doc = ("the accepted rule that a complaint should not be dismissed for failure to state a claim "
+           "unless it appears beyond doubt that the plaintiff can prove no set of facts *46 in support "
+           "of his claim which would entitle him to relief. 5 Here, the complaint alleged")
+    q = "unless it appears beyond doubt that the plaintiff can prove no set of facts in support of his claim which would entitle him to relief"
+    r = spans.verify(doc, q)
+    assert r["verified"], r
+    assert r["matched"].startswith("unless it appears") and r["matched"].endswith("to relief")
+    # curly quotes / dashes in the brief vs straight in the opinion
+    r2 = spans.verify('he said "no set of facts" — twice, and that\'s all', "he said “no set of facts” – twice, and that’s all")
+    assert r2["verified"]
+    # a real number inside the quote still has to match
+    assert not spans.verify("damages of 400 dollars were awarded", "damages of 500 dollars were awarded")["verified"]
+    assert spans.verify("damages of 400 dollars were awarded", "damages of 400 dollars were awarded")["verified"]

@@ -55,22 +55,31 @@ def check(text: str = Form(...), find_support: int = Form(1)):
         findings = verify.check_brief(text)
     except CL.CLError as e:
         raise HTTPException(400, str(e))
-    out = []
-    for f in findings:
-        d = f.to_dict()
-        # model pass only for paraphrased, real, right-case citations
+    out = [f.to_dict() for f in findings]
+    # model pass only for paraphrased, real, right-case citations -- run them
+    # concurrently; each is an independent call to Vultr Inference
+    jobs = []
+    for d, f in zip(out, findings):
         if find_support and f.status == "UNQUOTED" and inf.api_key and f.cl_url:
             try:
                 cid = int(f.cl_url.rstrip("/").split("/")[-2]) if "/opinion/" in f.cl_url else None
             except ValueError:
                 cid = None
-            try:
-                if cid:
-                    opinion, _ = CL.opinion_text(cid)
-                    d["support"] = support.find_support(inf, _context(text, f.citation), opinion)
-            except Exception as e:
-                d["support"] = {"error": str(e)[:120]}
-        out.append(d)
+            if cid:
+                jobs.append((d, cid, _context(text, f.citation)))
+
+    def _one(job):
+        d, cid, ctx = job
+        try:
+            opinion, _ = CL.opinion_text(cid)
+            d["support"] = support.find_support(inf, ctx, opinion)
+        except Exception as e:
+            d["support"] = {"error": str(e)[:120]}
+
+    if jobs:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            list(ex.map(_one, jobs))
     counts = {}
     for d in out:
         counts[d["status"]] = counts.get(d["status"], 0) + 1
