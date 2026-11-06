@@ -4,6 +4,8 @@
 
 **Live:** https://cite.nota.lawyer
 
+![Cite Checker](docs/cover.png)
+
 Built for the [Vultr: Agent Rush Hackathon](https://lablab.ai/ai-hackathons/vultr-hackathon) — Challenge 1, *Blast Radius Zero*.
 
 ---
@@ -68,6 +70,8 @@ Chambers v. Time Warner, Inc., 282 F.3d 147      UNQUOTED  (resolved to cluster 
 ```
 
 ## Blast radius zero
+
+![architecture](docs/architecture.png)
 
 The app runs on a Vultr Cloud Compute instance in a container that is read-only, unprivileged (`nobody`), every capability dropped, `no-new-privileges`, 512 MB, 128 pids. Its network is a Docker **internal** bridge: the kernel gives it no route off the host at all. The only door out is `deploy/egress-proxy`, a 90-line CONNECT proxy that allows exactly two hostnames on 443 — `courtlistener.com` and `api.vultrinference.com` — and refuses everything else **by hostname**, logging each refusal as a JSON line. (An earlier version pinned IPs with ipset; CourtListener sits behind CloudFront and the IPs rotated out from under it within hours. Hostnames are the right primitive.) Caddy terminates TLS on a separate bridge.
 
