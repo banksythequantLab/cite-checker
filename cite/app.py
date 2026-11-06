@@ -22,7 +22,7 @@ import verify                   # noqa: E402
 from inference import Vultr     # noqa: E402
 
 UI = HERE.parent / "ui" / "index.html"
-app = FastAPI(title="Cite Checker")
+app = FastAPI(title="Legal Cite Checker")
 inf = Vultr()
 
 

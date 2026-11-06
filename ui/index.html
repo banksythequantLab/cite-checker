@@ -3,38 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cite Checker — every citation in a brief, checked against the real opinion</title>
+<title>Legal Cite Checker — the career saver · every citation in a brief, checked against the real opinion</title>
 <meta name="description" content="Paste a brief. Every case cite is checked against the real opinion: does it exist, is it the case you named, is the quote really in it. The AI proposes, the opinion decides, a lawyer reviews.">
 <link rel="canonical" href="https://cite.nota.lawyer/">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Cite Checker">
+<meta property="og:site_name" content="Legal Cite Checker">
 <meta property="og:url" content="https://cite.nota.lawyer/">
-<meta property="og:title" content="Cite Checker — every citation in a brief, checked against the real opinion">
+<meta property="og:title" content="Legal Cite Checker — the career saver">
 <meta property="og:description" content="Does the case exist? Is it the case you named? Is the quote really in it? One click runs a demo brief seeded with the Avianca fabrications.">
 <meta property="og:image" content="https://cite.nota.lawyer/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Cite Checker: findings for a demo brief — a misquote, a citation not in the database, a verified quote">
+<meta property="og:image:alt" content="Legal Cite Checker: findings for a demo brief — a misquote, a citation not in the database, a verified quote">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Cite Checker — every citation in a brief, checked against the real opinion">
+<meta name="twitter:title" content="Legal Cite Checker — the career saver">
 <meta name="twitter:description" content="Does the case exist? Is it the case you named? Is the quote really in it? Try the one-click demo.">
 <meta name="twitter:image" content="https://cite.nota.lawyer/og.png">
 <style>
 :root{--bg:#0b0d11;--panel:#12151c;--panel2:#171b24;--line:#242a36;--ink:#e9edf3;--dim:#8a93a6;
   --accent:#5b9cff;--ok:#2fbf71;--warn:#f0a93b;--bad:#f0544f;--gold:#d8b25a;
-  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --field:#0e1016;--okbg:#0f2419;--okline:#1d4d35;--badbg:#24100f;--badline:#53241f;--warnbg:#241f10;--warnline:#5c4a1c;--accbg:#0d1626;--accline:#1e3a66;
+  --btn:#14284a;--btnink:#cfe0ff;--btnline:#1e3a66;--quotebad:#ffb4ae;color-scheme:dark}
+:root[data-theme="light"]{--bg:#f6f7fa;--panel:#ffffff;--panel2:#eef1f6;--line:#d9dee8;--ink:#15181f;--dim:#5b6472;
+  --accent:#2563eb;--ok:#15803d;--warn:#b45309;--bad:#dc2626;--gold:#92400e;
+  --field:#ffffff;--okbg:#ecfdf3;--okline:#86efac;--badbg:#fef2f2;--badline:#fca5a5;--warnbg:#fffbeb;--warnline:#fcd34d;--accbg:#eff6ff;--accline:#93c5fd;
+  --btn:#2563eb;--btnink:#ffffff;--btnline:#1d4ed8;--quotebad:#991b1b;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
 header{padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 h1{margin:0;font-size:15px;letter-spacing:.12em;text-transform:uppercase;font-weight:700}
 h1 em{color:var(--dim);font-weight:400;text-transform:none;letter-spacing:.01em;font-size:12.5px;margin-left:8px;font-style:normal}
 .pill{font:600 10.5px/1 var(--mono);padding:5px 9px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
-.pill.on{color:var(--ok);border-color:#1d4d35;background:#0f2419}.pill.off{color:var(--bad);border-color:#53241f;background:#24100f}
+.pill.on{color:var(--ok);border-color:var(--okline);background:var(--okbg)}.pill.off{color:var(--bad);border-color:var(--badline);background:var(--badbg)}
 main{max-width:1120px;margin:0 auto;padding:22px 24px;display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:20px}
 @media(max-width:920px){main{grid-template-columns:1fr}}
 h2{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);font-weight:700;margin:0 0 10px}
-textarea{width:100%;height:360px;background:#0e1016;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:11px;font:12px/1.5 var(--mono);resize:vertical}
-button{font:600 12.5px/1 inherit;padding:9px 14px;border-radius:7px;cursor:pointer;background:#14284a;color:#cfe0ff;border:1px solid #1e3a66}
+textarea{width:100%;height:360px;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:11px;font:12px/1.5 var(--mono);resize:vertical}
+button{font:600 12.5px/1 inherit;padding:9px 14px;border-radius:7px;cursor:pointer;background:var(--btn);color:var(--btnink);border:1px solid var(--btnline)}
 button:hover{border-color:var(--accent)}button:disabled{opacity:.45;cursor:default}
 button.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -42,15 +48,15 @@ button.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--li
 .card.VERIFIED{border-left-color:var(--ok)}.card.UNQUOTED{border-left-color:var(--accent)}
 .card.MISQUOTE,.card.WRONG_CASE{border-left-color:var(--warn)}.card.NOT_FOUND{border-left-color:var(--bad)}.card.AMBIGUOUS{border-left-color:var(--dim)}
 .badge{display:inline-block;font:700 10px/1 var(--mono);padding:4px 8px;border-radius:4px;border:1px solid var(--line);letter-spacing:.06em}
-.badge.VERIFIED{color:var(--ok);border-color:#1d4d35;background:#0f2419}
-.badge.UNQUOTED{color:var(--accent);border-color:#1e3a66;background:#0d1626}
-.badge.MISQUOTE,.badge.WRONG_CASE{color:var(--warn);border-color:#5c4a1c;background:#241f10}
-.badge.NOT_FOUND{color:var(--bad);border-color:#53241f;background:#24100f}
+.badge.VERIFIED{color:var(--ok);border-color:var(--okline);background:var(--okbg)}
+.badge.UNQUOTED{color:var(--accent);border-color:var(--accline);background:var(--accbg)}
+.badge.MISQUOTE,.badge.WRONG_CASE{color:var(--warn);border-color:var(--warnline);background:var(--warnbg)}
+.badge.NOT_FOUND{color:var(--bad);border-color:var(--badline);background:var(--badbg)}
 .badge.AMBIGUOUS{color:var(--dim)}
 .cite{font:700 13px/1.3 var(--mono)}.name{color:var(--ink)}.cl{color:var(--gold);font:12px/1.4 var(--mono)}
-.q{border-left:3px solid var(--ok);padding:6px 10px;margin:6px 0;background:#0f2419;border-radius:0 5px 5px 0;font:12px/1.45 var(--mono)}
-.q.bad{border-left-color:var(--bad);background:#1b0f0e;color:#ffb4ae}
-.q.sup{border-left-color:var(--accent);background:#0d1626}
+.q{border-left:3px solid var(--ok);padding:6px 10px;margin:6px 0;background:var(--okbg);border-radius:0 5px 5px 0;font:12px/1.45 var(--mono)}
+.q.bad{border-left-color:var(--bad);background:var(--badbg);color:var(--quotebad)}
+.q.sup{border-left-color:var(--accent);background:var(--accbg)}
 .note{color:var(--dim);font-size:12px;margin:4px 0}
 .kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;min-width:96px}
@@ -61,9 +67,10 @@ a{color:var(--accent)}
 </head>
 <body>
 <header>
-  <h1>Cite Checker <em>every citation, checked against the real opinion</em></h1>
+  <h1>Legal Cite Checker <em>the career saver · every citation, checked against the real opinion</em></h1>
   <span class="pill" id="p-cl">CourtListener · …</span>
   <span class="pill" id="p-model">model · …</span>
+  <button class="ghost" id="theme" title="Switch light / dark" style="margin-left:auto;padding:6px 10px;font-size:12px">☀ light</button>
 </header>
 <main>
   <section>
@@ -92,6 +99,11 @@ a{color:var(--accent)}
 </main>
 <script>
 const q=s=>document.querySelector(s);
+(function(){const root=document.documentElement;let t=null;try{t=localStorage.getItem('theme');}catch(e){}
+  if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  const apply=v=>{root.dataset.theme=v;const b=q('#theme');if(b)b.textContent=v==='light'?'☾ dark':'☀ light';};
+  apply(t);
+  addEventListener('DOMContentLoaded',()=>{apply(root.dataset.theme);q('#theme').onclick=()=>{const v=root.dataset.theme==='light'?'dark':'light';apply(v);try{localStorage.setItem('theme',v);}catch(e){}};});})();
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const LABEL={NOT_FOUND:'NOT IN CL',WRONG_CASE:'WRONG CASE',MISQUOTE:'MISQUOTE',AMBIGUOUS:'AMBIGUOUS',UNQUOTED:'UNQUOTED',VERIFIED:'VERIFIED',UNVERIFIABLE:'UNVERIFIABLE'};
 const label=s=>LABEL[s]||String(s).replace('_',' ');

@@ -1,4 +1,4 @@
-# Cite Checker
+# Legal Cite Checker — the career saver
 
 **Every citation in a brief, checked against the real opinion. The AI proposes; the opinion decides; a lawyer reviews every flag.**
 
