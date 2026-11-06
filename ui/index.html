@@ -53,7 +53,10 @@ a{color:var(--accent)}
 <main>
   <section>
     <h2>Brief</h2>
-    <div class="row" style="margin-bottom:8px"><button class="ghost" id="btn-sample">Load the demo brief</button></div>
+    <div class="row" style="margin-bottom:8px">
+      <button id="btn-demo" title="Loads the demo brief — two Avianca fabrications and one invented quote — and checks it">▶ Run the demo</button>
+      <button class="ghost" id="btn-sample">Load the demo brief only</button>
+    </div>
     <textarea id="brief" placeholder="Paste a brief, memorandum of law, or any text with case citations…"></textarea>
     <div class="row" style="margin-top:10px">
       <button id="btn-check">Check every citation</button>
@@ -84,6 +87,7 @@ Courts have uniformly held that the Montreal Convention's limitations period is 
 
 Finally, the Second Circuit has recognized that a court may consider documents integral to the complaint on a Rule 12(b)(6) motion. Chambers v. Time Warner, Inc., 282 F.3d 147 (2d Cir. 2002).`;
 q('#btn-sample').onclick=()=>{q('#brief').value=SAMPLE;};
+q('#btn-demo').onclick=()=>{q('#brief').value=SAMPLE;q('#btn-check').click();};
 async function health(){const h=await api('/api/health');
   const c=q('#p-cl');c.textContent='CourtListener · '+(h.courtlistener_token?'token set':'NO TOKEN');c.className='pill '+(h.courtlistener_token?'on':'off');
   const m=q('#p-model');m.textContent='model · '+(h.model||'unset');m.className='pill '+(h.model?'on':'');}
