@@ -94,3 +94,41 @@ def test_quote_survives_star_pagination_and_footnote_markers():
     # a real number inside the quote still has to match
     assert not spans.verify("damages of 400 dollars were awarded", "damages of 500 dollars were awarded")["verified"]
     assert spans.verify("damages of 400 dollars were awarded", "damages of 400 dollars were awarded")["verified"]
+
+
+def test_extract_docx_includes_footnotes_and_refuses_bombs(tmp_path):
+    import io, zipfile, extract_file as X
+    W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    def doc(body):
+        return f'<w:document xmlns:w="{W}"><w:body>{body}</w:body></w:document>'
+    def para(t): return f'<w:p><w:r><w:t>{t}</w:t></w:r></w:p>'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", doc(para("See Bell Atlantic Corp. v. Twombly, 550 U.S. 544 (2007).")))
+        z.writestr("word/footnotes.xml", f'<w:footnotes xmlns:w="{W}">{para("Ashcroft v. Iqbal, 556 U.S. 662 (2009).")}</w:footnotes>')
+    text = X.extract("brief.docx", buf.getvalue())
+    assert "550 U.S. 544" in text and "556 U.S. 662" in text
+    assert len(EX.extract(text)) == 2
+    # a docx that declares a huge expansion is refused before anything is parsed
+    bomb = io.BytesIO()
+    with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("word/document.xml", b"\0" * (X.MAX_DOCX_UNCOMPRESSED + 1))
+    try:
+        X.extract("bomb.docx", bomb.getvalue()); assert False, "bomb accepted"
+    except X.ExtractError as e:
+        assert "cap" in str(e)
+    assert X.extract("b.txt", b"Twombly, 550 U.S. 544").startswith("Twombly")
+
+
+def test_extract_pdf():
+    import extract_file as X
+    from pypdf import PdfWriter
+    import io
+    w = PdfWriter(); page = w.add_blank_page(width=612, height=792)
+    # pypdf can't lay out text without a font resource; use an annotation-free
+    # minimal content stream via a generated page is overkill -- just check caps/errors
+    out = io.BytesIO(); w.write(out)
+    try:
+        X.extract("empty.pdf", out.getvalue()); assert False
+    except X.ExtractError as e:
+        assert "no extractable text" in str(e)

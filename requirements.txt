@@ -4,3 +4,4 @@ openai>=3.0
 httpx>=0.28
 python-multipart>=0.0.9
 zstandard>=0.23
+pypdf>=5.0

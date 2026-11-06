@@ -7,13 +7,14 @@ import re
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import courtlistener as CL      # noqa: E402
 import extract as EX            # noqa: E402
+import extract_file             # noqa: E402
 import support                  # noqa: E402
 import verify                   # noqa: E402
 from inference import Vultr     # noqa: E402
@@ -53,6 +54,17 @@ def _context(text: str, raw_cite: str, width: int = 420) -> str:
         return ""
     lo = max(0, i - width)
     return text[lo:i + len(raw_cite)]
+
+
+@app.post("/api/extract")
+async def extract(file: UploadFile = File(...)):
+    """Turn an uploaded .docx / .pdf / .txt brief into text for the editor."""
+    data = await file.read(extract_file.MAX_UPLOAD + 1)
+    try:
+        text = extract_file.extract(file.filename or "", data)
+    except extract_file.ExtractError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "filename": file.filename, "chars": len(text), "text": text}
 
 
 @app.post("/api/check")

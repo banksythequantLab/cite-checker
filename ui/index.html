@@ -71,8 +71,11 @@ a{color:var(--accent)}
     <div class="row" style="margin-bottom:8px">
       <button id="btn-demo" title="Loads the demo brief — two Avianca fabrications and one invented quote — and checks it">▶ Run the demo</button>
       <button class="ghost" id="btn-sample">Load the demo brief only</button>
+      <label class="ghost" style="font:600 12.5px/1 inherit;padding:9px 14px;border-radius:7px;cursor:pointer;background:var(--panel2);color:var(--ink);border:1px solid var(--line)">
+        Open a .docx / .pdf / .txt<input type="file" id="file" accept=".docx,.pdf,.txt,.md" style="display:none"></label>
+      <span class="note" id="filenote"></span>
     </div>
-    <textarea id="brief" placeholder="Paste a brief, memorandum of law, or any text with case citations…"></textarea>
+    <textarea id="brief" placeholder="Paste a brief, memorandum of law, or any text with case citations — or drop a .docx / .pdf / .txt here…"></textarea>
     <div class="row" style="margin-top:10px">
       <button id="btn-check">Check every citation</button>
       <label class="note"><input type="checkbox" id="sup" checked> find supporting passages for paraphrased cites</label>
@@ -103,6 +106,18 @@ Courts have uniformly held that the Montreal Convention's limitations period is 
 Finally, the Second Circuit has recognized that a court may consider documents integral to the complaint on a Rule 12(b)(6) motion. Chambers v. Time Warner, Inc., 282 F.3d 147 (2d Cir. 2002).`;
 q('#btn-sample').onclick=()=>{q('#brief').value=SAMPLE;};
 q('#btn-demo').onclick=()=>{q('#brief').value=SAMPLE;q('#btn-check').click();};
+async function loadFile(f){
+  if(!f)return; const n=q('#filenote'); n.textContent='reading '+f.name+'…';
+  const fd=new FormData(); fd.append('file',f,f.name);
+  let r; try{ r=await (await fetch('/api/extract',{method:'POST',body:fd})).json(); }catch(e){ r={detail:String(e)}; }
+  if(r&&r.ok){ q('#brief').value=r.text; n.textContent=f.name+' · '+r.chars.toLocaleString()+' characters — now check it'; }
+  else { n.textContent='could not read '+f.name+': '+(r&&r.detail||'error'); }
+}
+q('#file').onchange=e=>loadFile(e.target.files[0]);
+const ta=q('#brief');
+ta.addEventListener('dragover',e=>{e.preventDefault();ta.style.borderColor='var(--accent)';});
+ta.addEventListener('dragleave',()=>{ta.style.borderColor='';});
+ta.addEventListener('drop',e=>{e.preventDefault();ta.style.borderColor='';const f=e.dataTransfer.files[0];if(f)loadFile(f);});
 async function health(){const h=await api('/api/health');
   const c=q('#p-cl');c.textContent='CourtListener · '+(h.courtlistener_token?'token set':'NO TOKEN');c.className='pill '+(h.courtlistener_token?'on':'off');
   const m=q('#p-model');m.textContent='model · '+(h.model||'unset');m.className='pill '+(h.model?'on':'');}
