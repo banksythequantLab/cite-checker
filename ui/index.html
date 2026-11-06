@@ -125,7 +125,7 @@ q('#btn-check').onclick=async e=>{
   const text=q('#brief').value.trim();if(!text)return;
   e.target.disabled=true;e.target.textContent='Checking against CourtListener…';
   const fd=new FormData();fd.append('text',text);fd.append('find_support',q('#sup').checked?1:0);
-  let r;try{r=await api('/api/check',{method:'POST',body:fd});}catch(err){r={ok:false,detail:String(err)};}
+  let r;try{const resp=await fetch('/api/check',{method:'POST',body:fd});r=await resp.json();if(!resp.ok&&r&&!('ok' in r))r={ok:false,detail:r.detail};}catch(err){r={ok:false,detail:String(err)};}
   e.target.disabled=false;e.target.textContent='Check every citation';
   render(r);
 };

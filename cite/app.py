@@ -8,13 +8,15 @@ import sys
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.requests import Request
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import courtlistener as CL      # noqa: E402
 import extract as EX            # noqa: E402
 import extract_file             # noqa: E402
+import ratelimit                # noqa: E402
 import support                  # noqa: E402
 import verify                   # noqa: E402
 from inference import Vultr     # noqa: E402
@@ -22,6 +24,17 @@ from inference import Vultr     # noqa: E402
 UI = HERE.parent / "ui" / "index.html"
 app = FastAPI(title="Cite Checker")
 inf = Vultr()
+
+
+@app.middleware("http")
+async def _rate_limit(request: Request, call_next):
+    if request.method == "POST":
+        ip = ratelimit.client_ip(request.headers, request.client.host if request.client else "?")
+        ok, why = ratelimit.check(request.url.path, ip)
+        if not ok:
+            return JSONResponse({"ok": False, "detail": why}, status_code=429,
+                                headers={"Retry-After": "60"})
+    return await call_next(request)
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -132,3 +132,15 @@ def test_extract_pdf():
         X.extract("empty.pdf", out.getvalue()); assert False
     except X.ExtractError as e:
         assert "no extractable text" in str(e)
+
+
+def test_rate_limit_per_ip(monkeypatch):
+    import ratelimit as RL
+    monkeypatch.setitem(RL.LIMITS, "/api/check", (2, 3))
+    RL._hits.clear()
+    assert RL.check("/api/check", "1.2.3.4")[0]
+    assert RL.check("/api/check", "1.2.3.4")[0]
+    ok, why = RL.check("/api/check", "1.2.3.4"); assert not ok and "per minute" in why
+    assert RL.check("/api/check", "5.6.7.8")[0]          # another address is unaffected
+    assert RL.check("/api/health", "1.2.3.4")[0]         # unlimited route
+    assert RL.client_ip({"x-forwarded-for": "9.9.9.9, 10.0.0.1"}, "10.0.0.1") == "9.9.9.9"
