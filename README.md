@@ -107,3 +107,15 @@ CourtListener's free tier is **125 opinion requests per day**; results are cache
 ## License
 
 MIT — Banksy AI LLC. See [LICENSE](LICENSE).
+
+### Resuming a torn bulk-text build
+
+The 55 GB opinions dump streams straight from S3; if the transfer is cut, `build-text` keeps what it stored and refuses to mark the store complete. `scripts/bz2_resume.py` turns a byte-range tail of the `.bz2` into a valid standalone stream (bit-level block resync, recomputed trailer CRC) and `scripts/csv_resync.py` drops the torn first record, so the build resumes from the cut instead of starting over:
+
+```bash
+curl -r $OFFSET- $URL | python3 scripts/bz2_resume.py | lbzip2 -dc \
+  | python3 scripts/csv_resync.py --header "$HEADER" \
+  | python3 cite/bulk.py build-text --stdin --out /data/cl.db
+```
+
+Rows are `INSERT OR REPLACE` by opinion id, so overlapping the cut is harmless.

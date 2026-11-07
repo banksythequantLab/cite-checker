@@ -143,7 +143,10 @@ def _finish_text(c, rows: int, complete: bool, date: str | None = None):
     text_date is written only for a complete build; text_rows is always
     written so /api/health can report a partial store honestly."""
     c.execute("CREATE INDEX IF NOT EXISTS ix_op_cluster ON opinions(cluster_id)")
-    c.execute("INSERT OR REPLACE INTO meta VALUES('text_rows',?)", (str(rows),))
+    # count the whole table (a resumed build adds to rows stored earlier);
+    # SQLite answers count(*) from the small cluster_id index, not the blobs.
+    total = c.execute("SELECT count(*) FROM opinions").fetchone()[0]
+    c.execute("INSERT OR REPLACE INTO meta VALUES('text_rows',?)", (str(total),))
     if complete:
         c.execute("INSERT OR REPLACE INTO meta VALUES('text_date',?)", (date,))
     c.commit()
