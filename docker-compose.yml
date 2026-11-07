@@ -9,6 +9,7 @@ services:
       - HTTPS_PROXY=http://egress-proxy:3128
       - HTTP_PROXY=http://egress-proxy:3128
       - CITE_BULK_DB=/data/cl.db      # local CourtListener index (cite/bulk.py); API is the fallback
+      - CITE_BULK_TEXT_DB=/text/cl-text.db   # opinion text store; on the VM this is local NVMe (HDD block storage is too slow for index reads)
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -20,6 +21,7 @@ services:
     volumes:
       - cache:/cache
       - ${CITE_DATA_DIR:-/opt/cite/data}:/data:ro
+      - ${CITE_TEXT_DIR:-/opt/cite/data}:/text:ro
     networks: [cite-net]
     expose: ["8120"]
 

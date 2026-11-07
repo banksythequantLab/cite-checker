@@ -95,7 +95,7 @@ python3 -m pytest tests/ -q     # 7 tests, no network
 
 Deploy to Vultr: put `VULTR_API_KEY` in `.env` and run `python3 deploy/vultr_create.py`. It renders `deploy/cloud-init.sh` as user data; the instance installs Docker, clones this repo and brings up the stack. Then run `bash deploy/verify_egress.sh` on the instance.
 
-CourtListener's free tier is **125 opinion requests per day**; results are cached in SQLite so a re-check is free. The product version loads CourtListener's bulk opinion dump onto Vultr Block Storage and never hits the quota.
+CourtListener's free tier is **125 opinion requests per day**; results are cached in SQLite so a re-check is free. The product version loads CourtListener's bulk dumps: the citation index (2.6 GB) sits on Vultr Block Storage, the opinion text store (tens of GB, random reads) on the instance's NVMe disk (`CITE_TEXT_DIR`), and a check never hits the quota.
 
 ## Limits, stated plainly
 
