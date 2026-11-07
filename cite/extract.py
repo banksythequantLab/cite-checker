@@ -73,18 +73,50 @@ def _nearby_quotes(text: str, start: int, lo: int) -> list[str]:
     return [q.strip() for q in qs]
 
 
+def _trailing_parenthetical(text: str, end: int) -> tuple[list[str], int]:
+    """Bluebook explanatory parenthetical right after a cite --
+    `550 U.S. 544 (2007) ("plausible on its face")` -- belongs to THIS cite,
+    not the next one. Returns (quotes, end of the parenthetical) or ([], end).
+    Balanced-paren scan, bounded, so `(quoting Foo (2d Cir. 2001))` is one unit;
+    consecutive parentheticals `(quoting X) ("...")` are all consumed."""
+    quotes: list[str] = []
+    while True:
+        m = re.match(r"\s*\(", text[end:end + 8])
+        if not m:
+            return quotes, end
+        i = end + m.end()
+        depth = 1
+        limit = min(len(text), i + 900)
+        while i < limit and depth:
+            ch = text[i]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            i += 1
+        if depth:
+            return quotes, end
+        inner = text[end + m.end():i - 1]
+        quotes += [q.strip() for q in re.findall(r"[\"“]([^\"”]{20,600})[\"”]", inner)]
+        end = i
+
+
 def extract(text: str) -> list[Citation]:
     out: list[Citation] = []
     by_key: dict[tuple, Citation] = {}
     prev_end = 0
     for m in CITE_RE.finditer(text):
         key = (m.group("vol"), re.sub(r"\s+", " ", m.group("rep")), m.group("page"))
+        # a cite nested inside a consumed parenthetical ("(quoting X, 1 F.3d 1)")
+        # is still extracted and checked; it just inherits no quotes from
+        # before it (prev_end is already past it, so the chunk is empty).
+        trailing, after = _trailing_parenthetical(text, m.end())
         if key in by_key:
             # the same case cited again, possibly with a NEW quote attached --
             # a brief's second cite of Twombly can carry a fabricated quote the
             # first did not. Merge the quotes; never drop an occurrence.
-            by_key[key].quotes.extend(_nearby_quotes(text, m.start(), prev_end))
-            prev_end = m.end()
+            by_key[key].quotes.extend(_nearby_quotes(text, m.start(), prev_end) + trailing)
+            prev_end = after
             continue
         before = text[max(0, m.start() - 160):m.start()]
         nm = NAME_RE.search(before)
@@ -95,9 +127,9 @@ def extract(text: str) -> list[Citation]:
             page=m.group("page"), pin=m.group("pin"),
             court=(m.group("court") or "").strip() or None, year=m.group("year"),
             start=m.start(), end=m.end(),
-            quotes=_nearby_quotes(text, m.start(), prev_end),
+            quotes=_nearby_quotes(text, m.start(), prev_end) + trailing,
         )
         by_key[key] = c
         out.append(c)
-        prev_end = m.end()
+        prev_end = max(prev_end, after)
     return out

@@ -144,3 +144,26 @@ def test_rate_limit_per_ip(monkeypatch):
     assert RL.check("/api/check", "5.6.7.8")[0]          # another address is unaffected
     assert RL.check("/api/health", "1.2.3.4")[0]         # unlimited route
     assert RL.client_ip({"x-forwarded-for": "9.9.9.9, 10.0.0.1"}, "10.0.0.1") == "9.9.9.9"
+
+
+def test_parenthetical_quote_belongs_to_preceding_cite():
+    # Bluebook explanatory parentheticals follow the cite; they must not be
+    # attributed to the NEXT cite (that produced a false MISQUOTE on Conley).
+    import extract
+    t = ('Bell Atlantic Corp. v. Twombly, 550 U.S. 544 (2007) ("state a claim to relief '
+         'that is plausible on its face"). Conley v. Gibson, 355 U.S. 41 (1957). '
+         'Ashcroft v. Iqbal, 556 U.S. 662, 678 (2009) (quoting Twombly, 550 U.S. at 570) '
+         '("Threadbare recitals of the elements of a cause of action will not do"). '
+         '"A pleading must contain more than labels." '
+         'Chambers v. Time Warner, Inc., 282 F.3d 147, 152 (2d Cir. 2002).')
+    got = {c.key: c.quotes for c in extract.extract(t)}
+    assert got["550 U.S. 544"] == ["state a claim to relief that is plausible on its face"]
+    assert got["355 U.S. 41"] == []
+    assert got["556 U.S. 662"] == ["Threadbare recitals of the elements of a cause of action will not do"]
+    assert got["282 F.3d 147"] == ["A pleading must contain more than labels."]
+
+
+def test_nested_cite_in_parenthetical_is_still_extracted():
+    import extract
+    t = 'Doe v. Roe, 100 F.3d 1 (2d Cir. 1996) (citing Fake v. Fake, 999 F.3d 999 (2d Cir. 2020)).'
+    assert [c.key for c in extract.extract(t)] == ["100 F.3d 1", "999 F.3d 999"]
