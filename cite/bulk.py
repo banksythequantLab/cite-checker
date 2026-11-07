@@ -136,6 +136,36 @@ def _prep(item):
     return (oid, cid, typ, zstd.ZstdCompressor(level=3).compress(text.encode()))
 
 
+def _finish_text(c, rows: int, complete: bool, date: str | None = None):
+    """Index + bookkeeping for the text store. The cluster_id index is what
+    makes opinion_text_local a point lookup instead of a scan of the whole
+    table (tens of GB); without it a single check would take minutes.
+    text_date is written only for a complete build; text_rows is always
+    written so /api/health can report a partial store honestly."""
+    c.execute("CREATE INDEX IF NOT EXISTS ix_op_cluster ON opinions(cluster_id)")
+    c.execute("INSERT OR REPLACE INTO meta VALUES('text_rows',?)", (str(rows),))
+    if complete:
+        c.execute("INSERT OR REPLACE INTO meta VALUES('text_date',?)", (date,))
+    c.commit()
+
+
+def text_status() -> dict:
+    """For /api/health: {text_date, text_rows, text_status} where status is
+    'complete', 'partial' (rows stored, build not finished) or 'none'."""
+    p = text_path(os.environ.get("CITE_BULK_DB", ""))
+    if not os.path.exists(p):
+        return {"text_date": None, "text_rows": 0, "text_status": "none"}
+    try:
+        t = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+        m = dict(t.execute("SELECT k, v FROM meta").fetchall())
+        t.close()
+    except sqlite3.Error:
+        return {"text_date": None, "text_rows": 0, "text_status": "none"}
+    rows = int(m.get("text_rows") or 0)
+    return {"text_date": m.get("text_date"), "text_rows": rows,
+            "text_status": "complete" if m.get("text_date") else ("partial" if rows else "none")}
+
+
 def build_text(date: str, out: str, stdin: bool = False, workers: int = 3):
     import multiprocessing as mp
     out = text_path(out)
@@ -184,12 +214,12 @@ def build_text(date: str, out: str, stdin: bool = False, workers: int = 3):
         # a torn stream (network cut, truncated pipe). Keep what was stored but
         # do NOT mark the store complete: the app must not serve a partial dump.
         c.commit()
+        _finish_text(c, kept, complete=False)
         print(f"STREAM TORN after {n:,} rows ({kept:,} stored): {e} -- text_date NOT written",
               file=sys.stderr)
         sys.exit(3)
     c.commit()
-    c.execute("INSERT OR REPLACE INTO meta VALUES('text_date',?)", (date,))
-    c.commit()
+    _finish_text(c, kept, complete=True, date=date)
     c.execute("PRAGMA journal_mode=DELETE")
     print(f"opinions: {n:,} rows, {kept:,} with text  ->  {out}", file=sys.stderr)
 
