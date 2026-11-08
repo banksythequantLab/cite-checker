@@ -10,6 +10,11 @@ services:
       - HTTP_PROXY=http://egress-proxy:3128
       - CITE_BULK_DB=/data/cl.db      # local CourtListener index (cite/bulk.py); API is the fallback
       - CITE_BULK_TEXT_DB=/text/cl-text.db   # opinion text store; on the VM this is local NVMe (HDD block storage is too slow for index reads)
+      # per-IP rate limits (cite/ratelimit.py). Raise for events where many people share one NAT address.
+      - RL_CHECK_MIN=${RL_CHECK_MIN:-6}
+      - RL_CHECK_DAY=${RL_CHECK_DAY:-120}
+      - RL_EXTRACT_MIN=${RL_EXTRACT_MIN:-12}
+      - RL_EXTRACT_DAY=${RL_EXTRACT_DAY:-300}
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

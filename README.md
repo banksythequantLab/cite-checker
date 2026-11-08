@@ -90,7 +90,7 @@ The app runs on a Vultr Cloud Compute instance in a container that is read-only,
 pip install -r requirements.txt
 cp .env.example .env            # COURTLISTENER_TOKEN, VULTR_INFERENCE_API_KEY
 uvicorn app:app --app-dir cite --port 8120
-python3 -m pytest tests/ -q     # 7 tests, no network
+python3 -m pytest tests/ -q     # 15 tests, no network
 ```
 
 Deploy to Vultr: put `VULTR_API_KEY` in `.env` and run `python3 deploy/vultr_create.py`. It renders `deploy/cloud-init.sh` as user data; the instance installs Docker, clones this repo and brings up the stack. Then run `bash deploy/verify_egress.sh` on the instance.
