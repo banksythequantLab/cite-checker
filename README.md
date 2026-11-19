@@ -1,12 +1,20 @@
 # Legal Cite Checker — the career saver
 
-**Every citation in a brief, checked against the real opinion. The AI proposes; the opinion decides; a lawyer reviews every flag.**
+**Every citation in a brief, checked against the real opinion. The opinion decides; a lawyer reviews every flag.**
 
 **Live:** https://cite.nota.lawyer
 
 ![Cite Checker](docs/cover.png)
 
-Built for the [Vultr: Agent Rush Hackathon](https://lablab.ai/ai-hackathons/vultr-hackathon) — Challenge 1, *Blast Radius Zero*.
+> **Where it runs now (since Nov 19, 2026).** The live site no longer runs on Vultr. It runs on a single private
+> on-premises machine (a B-AI Box), merged into that machine's own citation checker: a New York / Second Circuit
+> law library is consulted first, then a local copy of CourtListener's nationwide bulk data (18.1M citations,
+> 10.0M opinion texts, Sept 30 2026 snapshot). **No AI model is involved in the live version** and it calls no
+> outside service. The code for that deployment is in [`box/`](box/). Everything below the line describes the
+> original hackathon build on Vultr (Nov 3–8, 2026), kept as the record of what was submitted; the Vultr
+> instance and the model-proposed "supporting passage" feature were retired with the move.
+
+Originally built for the [Vultr: Agent Rush Hackathon](https://lablab.ai/ai-hackathons/vultr-hackathon) — Challenge 1, *Blast Radius Zero*.
 
 ---
 
@@ -103,6 +111,17 @@ CourtListener's free tier is **125 opinion requests per day**; results are cache
 - The regex handles federal and New York reporters plus WL. Other state reporters are not yet parsed.
 - Pin cites are extracted but not yet checked against page breaks.
 - The support pass is advisory. A verified passage proves the words are in the opinion, not that the proposition is good law.
+
+## The on-premises version (`box/`)
+
+| file | what it does |
+|---|---|
+| `box/cl_national.py` | read-only lookups in the nationwide CourtListener SQLite files (citation → case, case → opinion text) |
+| `box/apply_national_patch.py` | merges the nationwide fallback, explanatory-parenthetical quotes, 40 more reporters and Westlaw-cite handling into the host machine's existing checker |
+| `box/citepub/` | the public page: FastAPI front end, upload parsing, per-visitor rate limits, and `citepub.service`, a systemd unit that hides everything on the machine except the law library and allows loopback traffic only |
+| `box/national/cl_build.py`, `national_refresh.sh` | rebuild the nationwide files from each quarterly CourtListener dump: resumable download, build beside the live files, verify, swap, roll back on a failed test |
+
+Statuses on the live page: VERIFIED, UNQUOTED, MISQUOTE (the quote is not in the opinion's own text), CHECK, WRONG CASE, NOT FOUND (a coverage statement, not a fabrication verdict), NOT COVERED (Westlaw/Lexis numbers, federal statutes), REPEALED, SHORT CITE.
 
 ## License
 

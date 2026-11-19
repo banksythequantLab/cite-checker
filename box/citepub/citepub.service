@@ -1,0 +1,50 @@
+[Unit]
+Description=Legal Cite Checker public page (cite.nota.lawyer -> 127.0.0.1:8124) - box citation checker, sealed
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/banksy/lex/citepub
+Environment=LEX_DIR=/opt/banksy/lex PYTHONDONTWRITEBYTECODE=1 CITEPUB_DB_ENV=%d/lexdb
+Environment=RL_CHECK_MIN=6 RL_CHECK_DAY=120 RL_EXTRACT_MIN=12 RL_EXTRACT_DAY=300
+# the lex database login reaches the service as a systemd credential; the secrets folder itself stays hidden
+LoadCredential=lexdb:/opt/banksy/secrets/lex_db.env
+ExecStart=/opt/banksy/lex/citepub/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8124 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header
+Restart=on-failure
+RestartSec=5
+
+# --- containment: this is the only internet-facing code that touches the law library --------------------
+# everything under /opt/banksy is replaced by an empty read-only tree; only the checker's own folder is put back
+TemporaryFileSystem=/opt/banksy:ro
+BindReadOnlyPaths=/opt/banksy/lex
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# no route off the machine: it may only talk to loopback (PostgreSQL, and cloudflared talking to it)
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=3G
+TasksMax=64
+CPUQuota=400%
+
+[Install]
+WantedBy=multi-user.target
