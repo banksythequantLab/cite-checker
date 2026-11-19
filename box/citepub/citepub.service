@@ -11,6 +11,8 @@ Environment=LEX_DIR=/opt/banksy/lex PYTHONDONTWRITEBYTECODE=1 CITEPUB_DB_ENV=%d/
 Environment=RL_CHECK_MIN=6 RL_CHECK_DAY=120 RL_EXTRACT_MIN=12 RL_EXTRACT_DAY=300
 # the lex database login reaches the service as a systemd credential; the secrets folder itself stays hidden
 LoadCredential=lexdb:/opt/banksy/secrets/lex_db.env
+# the only place it may write: a private folder for the daily usage tally (counts only)
+StateDirectory=citepub
 ExecStart=/opt/banksy/lex/citepub/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8124 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header
 Restart=on-failure
 RestartSec=5

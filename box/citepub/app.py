@@ -27,6 +27,31 @@ _model = threading.Lock()                                              # one mod
 
 app = FastAPI(title="Legal Cite Checker", docs_url=None, redoc_url=None, openapi_url=None)
 
+# ---- usage tally: daily counts only. No brief text, no addresses, nothing that identifies a visitor. ----------
+USAGE = os.path.join(os.environ.get("STATE_DIRECTORY", "/tmp"), "usage.json")
+_ulock = threading.Lock()
+
+
+def _count(what: str, n: int = 1, referrer: str = ""):
+    import datetime, json, urllib.parse
+    try:
+        with _ulock:
+            try: data = json.load(open(USAGE))
+            except Exception: data = {}
+            day = data.setdefault(datetime.date.today().isoformat(), {})
+            day[what] = day.get(what, 0) + n
+            host = urllib.parse.urlparse(referrer).hostname if referrer else None
+            if host and not host.endswith("nota.lawyer"):
+                ref = day.setdefault("from", {}); ref[host[:60]] = ref.get(host[:60], 0) + 1
+            tmp = USAGE + ".tmp"; json.dump(data, open(tmp, "w"), indent=1); os.replace(tmp, USAGE)
+    except Exception:
+        pass                                    # counting must never break a check
+
+
+def _robot(request: Request) -> bool:
+    ua = (request.headers.get("user-agent") or "").lower()
+    return (not ua) or any(x in ua for x in ("cite-uptime", "curl/", "python", "bot", "spider", "crawl", "monitor", "scan"))
+
 
 def _db():
     """Lex connection for one check: read-only, with a ceiling on any single statement."""
@@ -52,7 +77,8 @@ async def _rate_limit(request: Request, call_next):
 
 
 @app.get("/")
-def index():
+def index(request: Request):
+    _count("robot_visits" if _robot(request) else "visits", referrer=request.headers.get("referer") or "")
     return FileResponse(os.path.join(HERE, "ui", "index.html"), headers={"Cache-Control": "no-cache"})
 
 
@@ -82,6 +108,7 @@ async def extract(file: UploadFile = File(...)):
         text = extract_file.extract(file.filename or "", data)
     except extract_file.ExtractError as e:
         raise HTTPException(400, str(e))
+    _count("uploads")
     return {"ok": True, "filename": file.filename, "chars": len(text), "text": text}
 
 
@@ -170,10 +197,13 @@ def check(request: Request, text: str = Form(...), find_support: int = Form(0)):
         except Exception:
             pass
     cards = [_card(c) for c in res["citations"]]
+    if _robot(request): _count("robot_checks")
+    else: _count("checks"); _count("citations", len(cards))
     support_note = ""
     if find_support:
         who = request.headers.get("cf-connecting-ip") or ratelimit.client_ip(request.headers, request.client.host if request.client else "?")
         support_note = _support(text, res["citations"], cards, who)
+        _count("passage_requests")
     counts = {}
     for c in cards:
         counts[c["status"]] = counts.get(c["status"], 0) + 1

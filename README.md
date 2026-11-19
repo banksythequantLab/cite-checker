@@ -121,6 +121,9 @@ CourtListener's free tier is **125 opinion requests per day**; results are cache
 | `box/citepub/` | the public page: FastAPI front end, upload parsing, per-visitor rate limits, and `citepub.service`, a systemd unit that hides everything on the machine except the law library and allows loopback traffic only |
 | `box/apply_abbrev_patch.py` | case names that differ only by a standard abbreviation ("N.A." / "Natl. Assn.") compare as the same case |
 | `box/citepub/support.py` | optional supporting-passage suggestions from the machine's own model, verified verbatim before display |
+| `box/apply_snapshot_note_patch.py` | a citation missing from the nationwide index and dated in or after the snapshot's year gets a note that it may simply be newer than the snapshot |
+| `box/citepub/usage.sh` | daily usage tally for the public page: counts only, no brief text and no visitor addresses |
+| `box/tests/cite_regress.sh` | one-command regression: saved test draft, ~900 citations from real opinions (no false flags allowed), and the mixed nationwide brief |
 | `box/national/install_national.sh` | one-time setup on a new machine: weekly refresh in cron, optional first build |
 | `box/national/cl_build.py`, `national_refresh.sh` | rebuild the nationwide files from each quarterly CourtListener dump: resumable download, build beside the live files, verify, swap, roll back on a failed test |
 
