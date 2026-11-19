@@ -75,10 +75,11 @@ rm -f "$D/READY"
 mkdir -p "$D/old"; mv -f "$D/cl.db" "$D/cl-text.db" "$D/old/" 2>/dev/null
 mv -f "$D/new/cl.db" "$D/new/cl-text.db" "$D/" && chmod 644 "$D/cl.db" "$D/cl-text.db" && touch "$D/READY" \
   || { log "SWAP FAILED - restoring the old files"; mv -f "$D/old/"* "$D/"; touch "$D/READY"; exit 1; }
-sudo -n systemctl restart citepub 2>>"$LOG" || log "could not restart citepub (it will pick the new files up on its next restart)"
-sleep 5
-if /opt/banksy/lex/citepub/smoke.sh >>"$LOG" 2>&1; then
-  date > "$D/done-$SNAP"; rm -rf "$D/old" "$D/dl" "$D/new"; log "NATIONAL_REFRESH_DONE snapshot=$SNAP"
-else
-  log "smoke test failed on the new files - rolling back"; rm -f "$D/READY"; mv -f "$D/old/"* "$D/"; touch "$D/READY"; sudo -n systemctl restart citepub; exit 1
+if [ -f /etc/systemd/system/citepub.service ]; then          # only the box that also serves the public page
+  sudo -n systemctl restart citepub 2>>"$LOG" || log "could not restart citepub (it will pick the new files up on its next restart)"
+  sleep 5
+  if ! /opt/banksy/lex/citepub/smoke.sh >>"$LOG" 2>&1; then
+    log "smoke test failed on the new files - rolling back"; rm -f "$D/READY"; mv -f "$D/old/"* "$D/"; touch "$D/READY"; sudo -n systemctl restart citepub; exit 1
+  fi
 fi
+date > "$D/done-$SNAP"; rm -rf "$D/old" "$D/dl" "$D/new"; log "NATIONAL_REFRESH_DONE snapshot=$SNAP"
