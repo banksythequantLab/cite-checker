@@ -124,6 +124,8 @@ CourtListener's free tier is **125 opinion requests per day**; results are cache
 | `box/apply_snapshot_note_patch.py` | a citation missing from the nationwide index and dated in or after the snapshot's year gets a note that it may simply be newer than the snapshot |
 | `box/citepub/usage.sh` | daily usage tally for the public page: counts only, no brief text and no visitor addresses |
 | `box/tests/cite_regress.sh` | one-command regression: saved test draft, ~900 citations from real opinions (no false flags allowed), and the mixed nationwide brief |
+| `box/apply_ingest_resilience_patch.py` | daily New York ingest: a court that times out is skipped for the day (the run used to die), fetched decisions are always merged, and a card is raised if a core court goes two weeks without a full update |
+| `box/lex_notable.py`, `apply_brief_notable_patch.py` | each morning, rule-based pick of new decisions worth a look (sanctions, fabricated citations, §1782, first impression, reversals, dissents); a local model adds one sentence only if its supporting quote is in the opinion verbatim; listed in the morning brief |
 | `box/national/install_national.sh` | one-time setup on a new machine: weekly refresh in cron, optional first build |
 | `box/national/cl_build.py`, `national_refresh.sh` | rebuild the nationwide files from each quarterly CourtListener dump: resumable download, build beside the live files, verify, swap, roll back on a failed test |
 
