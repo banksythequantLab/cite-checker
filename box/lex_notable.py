@@ -56,11 +56,12 @@ def score(row):
     if court in COURT_BONUS: tags.append(COURT_BONUS[court][0]); pts += COURT_BONUS[court][1]
     edges = text[:2500] + "\n" + text[-1500:]
     for tag, w, pat, zone in RULES:
-        m = re.search(pat, edges if zone == "edges" else text, re.I)
+        src = edges if zone == "edges" else text
+        m = re.search(pat, src, re.I)
         if not m: continue
         if tag == "section 1782" and not re.search(r"foreign|international", text, re.I): continue
         tags.append(tag); pts += w
-        if zone != "edges": hits.append((w, sentence_around(text, m)))
+        hits.append((w, sentence_around(src, m)))
     if len(text) > 25000: pts += 1
     hits.sort(key=lambda x: -x[0])
     return pts, tags, (hits[0][1] if hits else "")
@@ -100,6 +101,7 @@ def main():
     scored.sort(key=lambda x: (-x[0], str(x[3][3])))
     items = []
     for pts, tags, receipt, (cid, name, court, date, url, text) in scored[:a.top]:
+        receipt = receipt or re.sub(r"\s+", " ", text[-340:]).strip()          # never an empty receipt: fall back to the closing words of the decision
         summary, quote, ok = one_line(name, text, receipt, tags)
         items.append({"id": cid, "case_name": name, "court": LX.COURT.get(court, court) if hasattr(LX, "COURT") else court, "date": str(date), "url": url or "",
                       "tags": tags, "score": pts, "summary": summary, "quote": quote if ok else receipt[:400], "model_line": ok,
