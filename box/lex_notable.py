@@ -19,13 +19,19 @@ import lex_ask as LX
 
 OUT = "/opt/banksy/lex/notable"
 # tag, weight, pattern (searched case-insensitively over the whole opinion unless a zone is given)
+AI_W = r"(?:artificial intelligence|generative ai|\bgen ?ai\b|chatgpt|large language model|\bLLMs?\b|\bAI\b(?: tools?| programs?|-generated| generated)?)"
+CITE_W = r"(?:citations?|cited|case law|cases|authorit\w+|quotations?|briefs?|filings?|submissions?)"
 RULES = [
-    ("AI / fabricated citations", 6, r"artificial intelligence|generative ai\b|chatgpt|large language model|hallucinat\w+|(?:non-?existent|fictitious|fabricated|fake)\s+(?:cases?|citations?|authorit\w+|quotations?)", None),
+    # an AI word only counts next to a word about citing; a commercial case that merely involves an AI company is not this
+    ("AI / fabricated citations", 6, r"hallucinat\w+[^.]{0,140}\b" + CITE_W + r"\b|\b" + CITE_W + r"\b[^.]{0,140}hallucinat\w+|" + AI_W + r"[^.]{0,80}hallucinat\w+|phantom citations?|(?:non-?existent|fictitious|fabricated|fake|bogus|made-up)\s+(?:cases?|citations?|authorit\w+|quotations?|decisions?|opinions?)|(?:cases?|citations?|authorit\w+|decisions?) (?:that |which )?(?:do(?:es)? not|did not|don't) exist|" + AI_W + r"[^.]{0,160}\b" + CITE_W + r"\b|\b" + CITE_W + r"\b[^.]{0,160}" + AI_W, None),
     ("section 1782", 6, r"\b28\s+U\.?\s?S\.?\s?C\.?\s+(?:§+\s*)?1782\b|section\s+1782\b|§\s*1782\b", None),
-    ("first impression", 4, r"(?:issue|question|matter|case) of first impression|novel (?:question|issue)|ha[sv]e? not (?:yet |previously )?(?:been )?(?:addressed|decided|resolved|considered)(?: th(?:is|e) (?:issue|question))? (?:by|in) this court|this court has (?:not|never) (?:yet )?(?:addressed|decided|had occasion)", None),
-    ("departs from precedent", 4, r"\b(?:we|this court) (?:now |hereby )?overrule|should no longer be followed|(?:is|are) (?:hereby )?(?:overruled|abrogated)|we (?:now )?decline to follow our (?:prior|earlier)", None),
-    ("sanctions", 3, r"sanctions? (?:is|are|were|was) (?:warranted|imposed|appropriate|awarded)|impos\w+ (?:of )?sanctions|22 NYCRR (?:§+\s*)?130-1\.1|frivolous conduct|Rule 11 sanctions|sanctioned (?:counsel|plaintiff|defendant|the attorney)", None),
-    ("dissent", 2, r"\bdissent(?:s|ing)? (?:in|and|from)|, J\.?P?\.? ?\(dissenting\)|dissenting opinion|dissents and votes", None),
+    ("first impression", 4, r"(?:issue|question|matter|case) of first impression|presents? an? novel (?:question|issue)|ha[sv]e? not (?:yet |previously )?(?:been )?(?:addressed|decided|resolved|considered)(?: th(?:is|e) (?:issue|question))? (?:by|in) this court|this court has (?:not|never) (?:yet )?(?:addressed|decided|had occasion)", None),
+    # "objections are overruled" is a ruling on an objection, not on a precedent: the subject must be a case or a holding
+    ("departs from precedent", 4, r"\b(?:we|this court) (?:now |hereby )?overrule (?![^.]{0,60}objection)|should no longer be followed|(?:decisions?|holdings?|precedents?|cases|rule) (?:is|are) (?:hereby |now )?(?:overruled|abrogated)|we (?:now )?decline to follow our (?:prior|earlier)", None),
+    # a sanction actually sought or imposed in this case; not the standard of review, not "lawful sanctions" in immigration law
+    ("sanctions", 3, r"sanctions? (?:is|are|were|was) (?:warranted|imposed|appropriate|awarded)|(?:motion|request|application) for sanctions is (?:granted|denied)|(?:we|the court) (?:hereby |now |therefore )?(?:impose|award)s? sanctions|22 NYCRR (?:§+\s*)?130-1\.1|frivolous conduct|Rule 11 sanctions (?:are|is|were)|sanctioned (?:counsel|plaintiff|defendant|the attorney)|refer\w* [^.]{0,80}Grievance (?:Panel|Committee)|order(?:ed)? to show cause why (?:he|she|they|counsel|it) should not be sanctioned", None),
+    # a dissent in THIS decision; "(Smith, J., dissenting)" after a citation is someone else's
+    ("dissent", 2, r"\b(?:Judge|Justice) [A-Z][\w.' -]{1,40} dissents?\b|\bdissents? in a separate|\bdissents? and votes?\b|\(dissenting\)\s*[:.]|, dissenting(?: in part)?:|dissenting from the denial of rehearing|, JJ\.,? dissent(?!ing\))", None),
     ("reversed", 1.5, r"\b(?:is|are|be|and|unanimously|judgment|order),? reversed\b|\bREVERSED\b|\bVACATED AND REMANDED\b|\breversed, on the law\b", "edges"),
 ]
 COURT_BONUS = {"ny": ("Court of Appeals", 5), "ca2": ("2d Cir.", 1)}
