@@ -5,6 +5,7 @@
 #  3. with the nationwide index installed: the mixed brief gives the saved statuses (tests/expected_smoke.txt)
 # After an INTENDED change in behaviour, re-save the expectations with:  cite_regress.sh --accept
 cd /opt/banksy/lex || exit 2; PY=./venv/bin/python; fail=0
+counts(){ sed -E "s/in [0-9]+ opinions/in N opinions/; s/\([0-9]+ times\)/(N times)/"; }   # the library grows daily: how often a cite is printed is not a regression
 draft(){ $PY cite_check.py tests/cite_test_draft.txt 2>&1 | sed '$d'; }
 smoke(){ $PY cite_check.py citepub/smoke_brief.txt --json 2>/dev/null | $PY -c "
 import json,sys
@@ -14,7 +15,7 @@ if [ "${1:-}" = "--accept" ]; then
   draft > tests/expected_draft.txt; have_nat && smoke > tests/expected_smoke.txt
   echo "expectations saved"; exit 0
 fi
-if diff <(draft) tests/expected_draft.txt > /tmp/cite_regress_draft.diff; then echo "1 test draft: same as expected"; else echo "1 test draft: CHANGED (see /tmp/cite_regress_draft.diff)"; fail=1; fi
+if diff <(draft | counts) <(counts < tests/expected_draft.txt) > /tmp/cite_regress_draft.diff; then echo "1 test draft: same as expected"; else echo "1 test draft: CHANGED (see /tmp/cite_regress_draft.diff)"; fail=1; fi
 bad=0; n=0
 for s in "" q7 zz m3; do
   out=$(SALT=$s bash tests/cite_falsealarm.sh 2>&1); t=$(echo "$out" | grep '^TOTAL')
