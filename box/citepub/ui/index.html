@@ -77,7 +77,7 @@ a{color:var(--accent)}
   <section>
     <h2>Brief</h2>
     <div class="row" style="margin-bottom:8px">
-      <button id="btn-demo" title="Loads the demo brief — two Avianca fabrications and one invented quote — and checks it">▶ Run the demo</button>
+      <button id="btn-demo" title="Loads the demo brief (an Avianca fabrication, two of the Phoenix Fashion v. Saadia fabrications and one invented quote) and checks it live">▶ Run the demo</button>
       <button class="ghost" id="btn-sample">Load the demo brief only</button>
       <label class="ghost" style="font:600 12.5px/1 inherit;padding:9px 14px;border-radius:7px;cursor:pointer;background:var(--panel2);color:var(--ink);border:1px solid var(--line)">
         Open a .docx / .pdf / .txt<input type="file" id="file" accept=".docx,.pdf,.txt,.md" style="display:none"></label>
@@ -95,6 +95,7 @@ a{color:var(--accent)}
   <section>
     <h2>Findings</h2>
     <div class="kpis" id="kpis"></div>
+    <div id="exnote" class="note" style="margin:-4px 0 10px"></div>
     <div id="findings"><div class="empty">Check a brief to see findings.</div></div>
   </section>
 </main>
@@ -109,6 +110,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const LABEL={NOT_FOUND:'NOT FOUND',WRONG_CASE:'WRONG CASE',MISQUOTE:'MISQUOTE',CHECK:'CHECK',REPEALED:'REPEALED',ERROR:'ERROR',UNQUOTED:'UNQUOTED',VERIFIED:'VERIFIED',NOT_COVERED:'NOT COVERED',SHORT_CITE:'SHORT CITE'};
 const label=s=>LABEL[s]||String(s).replace('_',' ');
 const api=async(u,o)=>(await fetch(u,o)).json();
+const EXAMPLE={"ok": true, "citations": [{"citation": "550 U.S. 544, 570 (2007)", "case_name_in_brief": "Bell Atlantic Corp. v Twombly", "status": "VERIFIED", "kind": "case", "notes": ["printed with this case name in 1102 opinions in the library"], "quotes": [{"quote": "state a claim to relief that is plausible on its face.", "state": "exact", "verified": true, "detail": ""}], "source": "CourtListener", "cl_case_name": "Bell Atlantic Corp. v. Twombly (2007-05-21)", "cl_url": "https://www.courtlistener.com/opinion/145730/bell-atlantic-corp-v-twombly/"}, {"citation": "556 U.S. 662, 678 (2009)", "case_name_in_brief": "Ashcroft v Iqbal", "status": "VERIFIED", "kind": "case", "notes": ["printed with this case name in 1196 opinions in the library"], "quotes": [{"quote": "Threadbare recitals of the elements of a cause of action, supported by mere conclusory statements, do not suffice.", "state": "exact", "verified": true, "detail": ""}], "source": "CourtListener", "cl_case_name": "Ashcroft v. Iqbal (2009-05-18)", "cl_url": "https://www.courtlistener.com/opinion/145875/ashcroft-v-iqbal/"}, {"citation": "550 U.S. 544, 556 (2007)", "case_name_in_brief": "Bell Atlantic Corp. v Twombly", "status": "MISQUOTE", "kind": "case", "notes": ["printed with this case name in 1102 opinions in the library", "a quotation attributed to it was not found in the text"], "quotes": [{"quote": "a plaintiff must prove each element of the claim by clear and convincing evidence at the pleading stage.", "state": "missing", "verified": false, "detail": "not found in the opinion text"}], "source": "CourtListener", "cl_case_name": "Bell Atlantic Corp. v. Twombly (2007-05-21)", "cl_url": "https://www.courtlistener.com/opinion/145730/bell-atlantic-corp-v-twombly/"}, {"citation": "925 F.3d 1339 (11th Cir. 2019)", "case_name_in_brief": "Varghese v China Southern Airlines Co.", "status": "NOT_FOUND", "kind": "case", "notes": ["neither the case name nor this citation appears anywhere in the library", "the nationwide CourtListener index (2026-09-30 snapshot) has no case at this citation either. That index has gaps (unpublished and some state decisions) - confirm in Westlaw or Lexis before relying on it or striking it"], "quotes": []}, {"citation": "2019 WL 4639462", "case_name_in_brief": "Martinez v Delta Air Lines, Inc.", "status": "NOT_COVERED", "kind": "wl", "notes": ["Westlaw / Lexis database citation: neither the library nor the nationwide index is keyed by these numbers - pull it in Westlaw or Lexis and confirm the case exists"], "quotes": []}, {"citation": "987 F.3d 123 (2d Cir. 2022)", "case_name_in_brief": "XYZ Corp. v ABC Inc.", "status": "NOT_FOUND", "kind": "case", "notes": ["neither the case name nor this citation appears anywhere in the library", "the nationwide CourtListener index (2026-09-30 snapshot) has no case at this citation either. That index has gaps (unpublished and some state decisions) - confirm in Westlaw or Lexis before relying on it or striking it", "a court decision in the library lists this citation as a nonexistent case (Phoenix Fashion, Inc. v. Yakoub N. Saadia, 2d Cir., 2026-11-17)"], "quotes": []}, {"citation": "456 F.3d 789 (2d Cir. 2021)", "case_name_in_brief": "Doe v Smith", "status": "NOT_FOUND", "kind": "case", "notes": ["the case is in the library, but this reporter citation was never printed next to it", "the nationwide CourtListener index (2026-09-30 snapshot) has no case at this citation either. That index has gaps (unpublished and some state decisions) - confirm in Westlaw or Lexis before relying on it or striking it", "a court decision in the library lists this citation as a nonexistent case (Phoenix Fashion, Inc. v. Yakoub N. Saadia, 2d Cir., 2026-11-17)"], "quotes": [], "source": "NY library", "cl_case_name": "DOE v. Smith — N.D.N.Y., 2019-11-27", "cl_url": null}, {"citation": "282 F.3d 147 (2d Cir. 2002)", "case_name_in_brief": "Chambers v Time Warner, Inc.", "status": "UNQUOTED", "kind": "case", "notes": ["printed with this case name in 198 opinions in the library"], "quotes": [], "source": "CourtListener", "cl_case_name": "Chambers v. Time Warner (2002-02-21)", "cl_url": "https://www.courtlistener.com/opinion/776747/chambers-v-time-warner/"}], "counts": {"VERIFIED": 2, "MISQUOTE": 1, "NOT_FOUND": 3, "NOT_COVERED": 1, "UNQUOTED": 1}, "limits": "Checks that each citation exists and is paired with the right case, the year, quotations and NY statute sections - first against the box's own library (New York and Second Circuit), then against a local copy of CourtListener's nationwide index (2026-09-30 snapshot) for every other U.S. court. It does not tell you whether a case is still good law. CourtListener is missing many unpublished and some state decisions, so a citation it does not have is a reason to look, not proof of a fake."};
 const SAMPLE=`MEMORANDUM OF LAW IN SUPPORT OF DEFENDANT'S MOTION TO DISMISS
 
 To survive a motion to dismiss, a complaint must contain sufficient factual matter, accepted as true, to "state a claim to relief that is plausible on its face." Bell Atlantic Corp. v. Twombly, 550 U.S. 544, 570 (2007). "Threadbare recitals of the elements of a cause of action, supported by mere conclusory statements, do not suffice." Ashcroft v. Iqbal, 556 U.S. 662, 678 (2009).
@@ -117,9 +119,13 @@ Moreover, the Supreme Court has made clear that "a plaintiff must prove each ele
 
 Courts have uniformly held that the Montreal Convention's limitations period is subject to tolling. Varghese v. China Southern Airlines Co., 925 F.3d 1339 (11th Cir. 2019); Martinez v. Delta Air Lines, Inc., 2019 WL 4639462 (Tex. App. Sept. 25, 2019).
 
+The standard of review is de novo. XYZ Corp. v. ABC Inc., 987 F.3d 123 (2d Cir. 2022); Doe v. Smith, 456 F.3d 789 (2d Cir. 2021).
+
 Finally, the Second Circuit has recognized that a court may consider documents integral to the complaint on a Rule 12(b)(6) motion. Chambers v. Time Warner, Inc., 282 F.3d 147 (2d Cir. 2002).`;
 q('#btn-sample').onclick=()=>{q('#brief').value=SAMPLE;};
-q('#btn-demo').onclick=()=>{q('#brief').value=SAMPLE;q('#btn-check').click();};
+let demo=0;
+q('#btn-demo').onclick=()=>{q('#brief').value=SAMPLE;demo=1;q('#btn-check').click();};
+q('#brief').addEventListener('input',()=>{demo=0;});
 async function loadFile(f){
   if(!f)return; const n=q('#filenote'); n.textContent='reading '+f.name+'…';
   const fd=new FormData(); fd.append('file',f,f.name);
@@ -139,10 +145,10 @@ async function health(){const h=await api('/api/health');
 q('#btn-check').onclick=async e=>{
   const text=q('#brief').value.trim();if(!text)return;
   e.target.disabled=true;e.target.textContent='Checking both libraries…';
-  const fd=new FormData();fd.append('text',text);fd.append('find_support',q('#sup').checked?1:0);
+  const fd=new FormData();fd.append('text',text);fd.append('find_support',q('#sup').checked?1:0);fd.append('demo',demo);demo=0;
   let r;try{const resp=await fetch('/api/check',{method:'POST',body:fd});r=await resp.json();if(!resp.ok&&r&&!('ok' in r))r={ok:false,detail:r.detail};}catch(err){r={ok:false,detail:String(err)};}
   e.target.disabled=false;e.target.textContent='Check every citation';
-  render(r);
+  q('#exnote').textContent='';render(r);
 };
 function render(r){
   const f=q('#findings'),k=q('#kpis');
@@ -165,6 +171,7 @@ function render(r){
       ${(c.notes||[]).map(n=>`<div class="note">${esc(n)}</div>`).join('')}${body}</div>`;}).join('')+(r.limits?`<p class="note" style="margin-top:14px">${esc(r.limits)}</p>`:'');
 }
 health();
+if(!q('#brief').value.trim()){render(EXAMPLE);q('#exnote').innerHTML='<b>Example:</b> what this page found in the demo brief (checked Nov 28, 2026). Click <b>Run the demo</b> to check it live, or paste your own brief.';}
 </script>
 </body>
 </html>

@@ -11,7 +11,8 @@ tot = {}
 for day in days:
     r = d[day]; frm = ", ".join("%s %d" % kv for kv in sorted(r.get("from", {}).items(), key=lambda x: -x[1])[:4])
     print("%-11s %7d %7d %9d %8d %9d   %s" % (day, r.get("visits", 0), r.get("checks", 0), r.get("citations", 0), r.get("uploads", 0), r.get("passage_requests", 0), frm))
-    for k in ("visits", "checks", "citations", "uploads", "passage_requests", "robot_visits", "robot_checks"): tot[k] = tot.get(k, 0) + r.get(k, 0)
+    for k in ("visits", "checks", "citations", "uploads", "passage_requests", "robot_visits", "robot_checks", "demo_runs"): tot[k] = tot.get(k, 0) + r.get(k, 0)
 print("%-11s %7d %7d %9d %8d %9d" % ("total", tot.get("visits", 0), tot.get("checks", 0), tot.get("citations", 0), tot.get("uploads", 0), tot.get("passage_requests", 0)))
+print("demo runs (the one-click demo brief, not counted as checks): %d" % tot.get("demo_runs", 0))
 print("not counted above - automated visits: %d, automated checks: %d (uptime monitor, scanners, scripts)" % (tot.get("robot_visits", 0), tot.get("robot_checks", 0)))
 PY

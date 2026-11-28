@@ -27,4 +27,11 @@ if [ $bad -eq 0 ]; then echo "2 real opinions: $n citations, no false WRONG CASE
 if have_nat && [ -f tests/expected_smoke.txt ]; then
   if diff <(smoke) tests/expected_smoke.txt > /tmp/cite_regress_smoke.diff; then echo "3 nationwide brief: same as expected"; else echo "3 nationwide brief: CHANGED (see /tmp/cite_regress_smoke.diff)"; fail=1; fi
 else echo "3 nationwide brief: skipped (nationwide index not installed)"; fi
+# 4. citations a court lists as nonexistent (Phoenix Fashion v. Saadia, 2d Cir. Nov 17 2026) must not be verified by that very
+#    decision, while real cases cited in the same sanctions context still verify (bug found Nov 28 2026)
+if grep -q "Phoenix Fashion" <(echo "select 1" >/dev/null; $PY -c "import sys;sys.path.insert(0,'.');import lex_ask as L;print(L.db().execute(\"select count(*) from opinions where case_name ilike 'Phoenix Fashion%Saadia%'\").fetchone()[0] and 'Phoenix Fashion')" 2>/dev/null); then
+  printf '%s\n' "XYZ Corp. v. ABC Inc., 987 F.3d 123 (2d Cir. 2022); Doe v. Smith, 456 F.3d 789 (2d Cir. 2021); Smith v. Jones, 789 F.2d 123 (2d Cir. 2021). Park v. Kim, 91 F.4th 610 (2d Cir. 2024); Mata v. Avianca, Inc., 678 F. Supp. 3d 443 (S.D.N.Y. 2023)." > /tmp/cite_regress_fake.txt
+  got=$($PY cite_check.py /tmp/cite_regress_fake.txt --json 2>/dev/null | $PY -c "import json,sys;print(' '.join(c['status'] for c in json.load(sys.stdin)['citations']))")
+  if [ "$got" = "not_found not_found not_found verified verified" ]; then echo "4 fabricated citations a court disavowed: flagged, real ones verified"; else echo "4 fabricated citations a court disavowed: WRONG ($got)"; fail=1; fi
+else echo "4 fabricated citations: skipped (Phoenix Fashion order not in the library)"; fi
 [ $fail -eq 0 ] && echo "CITE REGRESS: PASS" || echo "CITE REGRESS: FAIL"; exit $fail

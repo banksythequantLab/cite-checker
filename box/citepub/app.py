@@ -176,7 +176,7 @@ def _support(text: str, raw: list, cards: list, who: str) -> str:
 
 
 @app.post("/api/check")
-def check(request: Request, text: str = Form(...), find_support: int = Form(0)):
+def check(request: Request, text: str = Form(...), find_support: int = Form(0), demo: int = Form(0)):
     if len(text) > MAX_CHARS:
         raise HTTPException(413, "that is %d characters; the limit here is %d" % (len(text), MAX_CHARS))
     if len(CC.scan(text)[1]) > MAX_CITES:
@@ -198,6 +198,7 @@ def check(request: Request, text: str = Form(...), find_support: int = Form(0)):
             pass
     cards = [_card(c) for c in res["citations"]]
     if _robot(request): _count("robot_checks")
+    elif demo: _count("demo_runs")                    # the one-click demo brief, kept apart from real checks
     else: _count("checks"); _count("citations", len(cards))
     support_note = ""
     if find_support:
